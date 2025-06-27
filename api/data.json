@@ -2,8 +2,16 @@
   "users": {
     "samuelmgaines": [
       {
+        "film_id": "992786",
+        "rating": 3.0
+      },
+      {
+        "film_id": "1116600",
+        "rating": 4.5
+      },
+      {
         "film_id": "854691",
-        "rating": 1.5
+        "rating": 1.0
       },
       {
         "film_id": "620281",
@@ -63,7 +71,7 @@
       },
       {
         "film_id": "277064",
-        "rating": 4.0
+        "rating": 3.5
       },
       {
         "film_id": "868114",
@@ -94,6 +102,10 @@
         "rating": 3.5
       },
       {
+        "film_id": "98813",
+        "rating": 3.5
+      },
+      {
         "film_id": "15051",
         "rating": 4.0
       },
@@ -112,6 +124,10 @@
       {
         "film_id": "51365",
         "rating": 2.5
+      },
+      {
+        "film_id": "48894",
+        "rating": 2.0
       },
       {
         "film_id": "51454",
@@ -138,8 +154,16 @@
         "rating": 5.0
       },
       {
+        "film_id": "50711",
+        "rating": 2.5
+      },
+      {
         "film_id": "51621",
         "rating": 5.0
+      },
+      {
+        "film_id": "46175",
+        "rating": 4.0
       },
       {
         "film_id": "40424",
@@ -182,12 +206,28 @@
         "rating": 4.5
       },
       {
+        "film_id": "51972",
+        "rating": 4.5
+      },
+      {
         "film_id": "51432",
         "rating": 4.0
       },
       {
+        "film_id": "50713",
+        "rating": 2.5
+      },
+      {
         "film_id": "51537",
+        "rating": 3.5
+      },
+      {
+        "film_id": "2706",
         "rating": 4.0
+      },
+      {
+        "film_id": "51947",
+        "rating": 3.5
       },
       {
         "film_id": "51390",
@@ -207,6 +247,10 @@
       }
     ],
     "embrune": [
+      {
+        "film_id": "1025047",
+        "rating": 2.5
+      },
       {
         "film_id": "503403",
         "rating": 2.5
@@ -404,6 +448,10 @@
         "rating": 3.5
       },
       {
+        "film_id": "328538",
+        "rating": 3.5
+      },
+      {
         "film_id": "333029",
         "rating": 5.0
       },
@@ -476,23 +524,35 @@
         "rating": 4.0
       },
       {
+        "film_id": "48894",
+        "rating": 1.5
+      },
+      {
         "film_id": "45537",
         "rating": 4.0
-      },
-      {
-        "film_id": "51454",
-        "rating": 4.0
-      },
-      {
-        "film_id": "2694",
-        "rating": 4.0
-      },
-      {
-        "film_id": "51898",
-        "rating": 3.0
       }
     ],
     "devinbaron": [
+      {
+        "film_id": "992786",
+        "rating": 3.5
+      },
+      {
+        "film_id": "1013666",
+        "rating": 2.5
+      },
+      {
+        "film_id": "1024562",
+        "rating": 5.0
+      },
+      {
+        "film_id": "470671",
+        "rating": 2.0
+      },
+      {
+        "film_id": "1025047",
+        "rating": 3.0
+      },
       {
         "film_id": "503403",
         "rating": 3.0
@@ -744,25 +804,13 @@
       {
         "film_id": "1001285",
         "rating": 2.0
-      },
-      {
-        "film_id": "842301",
-        "rating": 5.0
-      },
-      {
-        "film_id": "948553",
-        "rating": 4.0
-      },
-      {
-        "film_id": "1143900",
-        "rating": 5.0
-      },
-      {
-        "film_id": "834656",
-        "rating": 4.0
       }
     ],
     "Martendo24680": [
+      {
+        "film_id": "470671",
+        "rating": 3.5
+      },
       {
         "film_id": "503403",
         "rating": 4.5
@@ -1026,13 +1074,17 @@
       {
         "film_id": "508638",
         "rating": 1.5
-      },
-      {
-        "film_id": "371378",
-        "rating": 3.5
       }
     ],
     "stephaniebrown2": [
+      {
+        "film_id": "470671",
+        "rating": 2.5
+      },
+      {
+        "film_id": "1025047",
+        "rating": 2.5
+      },
       {
         "film_id": "738292",
         "rating": 3.5
@@ -1174,6 +1226,10 @@
         "rating": 4.0
       },
       {
+        "film_id": "475370",
+        "rating": 3.0
+      },
+      {
         "film_id": "390264",
         "rating": 3.0
       },
@@ -1187,7 +1243,7 @@
       },
       {
         "film_id": "328538",
-        "rating": 4.5
+        "rating": 5.0
       },
       {
         "film_id": "333029",
@@ -1242,6 +1298,10 @@
         "rating": 3.0
       },
       {
+        "film_id": "45120",
+        "rating": 3.0
+      },
+      {
         "film_id": "47776",
         "rating": 3.5
       },
@@ -1290,37 +1350,29 @@
         "rating": 3.0
       },
       {
+        "film_id": "50711",
+        "rating": 1.5
+      },
+      {
         "film_id": "51994",
         "rating": 3.0
       },
       {
         "film_id": "51290",
         "rating": 2.0
-      },
-      {
-        "film_id": "46998",
-        "rating": 3.5
-      },
-      {
-        "film_id": "51551",
-        "rating": 2.5
-      },
-      {
-        "film_id": "51543",
-        "rating": 3.0
-      },
-      {
-        "film_id": "47677",
-        "rating": 3.0
-      },
-      {
-        "film_id": "47119",
-        "rating": 2.0
       }
     ],
     "nkilpatrick": []
   },
   "films": {
+    "992786": {
+      "title": "28 Years Later",
+      "link": "/film/28-years-later/"
+    },
+    "1116600": {
+      "title": "Sinners",
+      "link": "/film/sinners-2025/"
+    },
     "854691": {
       "title": "A Minecraft Movie",
       "link": "/film/a-minecraft-movie/"
@@ -1413,6 +1465,10 @@
       "title": "It's Such a Beautiful Day",
       "link": "/film/its-such-a-beautiful-day/"
     },
+    "98813": {
+      "title": "Ernest & Celestine",
+      "link": "/film/ernest-celestine/"
+    },
     "15051": {
       "title": "Crazy, Stupid, Love.",
       "link": "/film/crazy-stupid-love/"
@@ -1432,6 +1488,10 @@
     "51365": {
       "title": "Mr. & Mrs. Smith",
       "link": "/film/mr-mrs-smith-2005/"
+    },
+    "48894": {
+      "title": "Kiss Kiss Bang Bang",
+      "link": "/film/kiss-kiss-bang-bang-2005/"
     },
     "51454": {
       "title": "Oldboy",
@@ -1457,9 +1517,17 @@
       "title": "The Sixth Sense",
       "link": "/film/the-sixth-sense/"
     },
+    "50711": {
+      "title": "Star Wars: Episode I \u2013 The Phantom Menace",
+      "link": "/film/star-wars-episode-i-the-phantom-menace/"
+    },
     "51621": {
       "title": "Good Will Hunting",
       "link": "/film/good-will-hunting/"
+    },
+    "46175": {
+      "title": "Perfect Blue",
+      "link": "/film/perfect-blue/"
     },
     "40424": {
       "title": "Happy Together",
@@ -1501,13 +1569,29 @@
       "title": "Forrest Gump",
       "link": "/film/forrest-gump/"
     },
+    "51972": {
+      "title": "Blade Runner",
+      "link": "/film/blade-runner/"
+    },
     "51432": {
       "title": "The Shining",
       "link": "/film/the-shining/"
     },
+    "50713": {
+      "title": "The Empire Strikes Back",
+      "link": "/film/the-empire-strikes-back/"
+    },
     "51537": {
       "title": "Life of Brian",
       "link": "/film/life-of-brian/"
+    },
+    "2706": {
+      "title": "Star Wars",
+      "link": "/film/star-wars/"
+    },
+    "51947": {
+      "title": "Taxi Driver",
+      "link": "/film/taxi-driver/"
     },
     "51390": {
       "title": "Monty Python and the Holy Grail",
@@ -1524,6 +1608,10 @@
     "50949": {
       "title": "It's a Wonderful Life",
       "link": "/film/its-a-wonderful-life/"
+    },
+    "1025047": {
+      "title": "The Phoenician Scheme",
+      "link": "/film/the-phoenician-scheme/"
     },
     "503403": {
       "title": "Mission: Impossible \u2013 The Final Reckoning",
@@ -1669,6 +1757,10 @@
       "title": "Sorry to Bother You",
       "link": "/film/sorry-to-bother-you/"
     },
+    "328538": {
+      "title": "The Florida Project",
+      "link": "/film/the-florida-project/"
+    },
     "333029": {
       "title": "Call Me by Your Name",
       "link": "/film/call-me-by-your-name/"
@@ -1737,13 +1829,17 @@
       "title": "Mysterious Skin",
       "link": "/film/mysterious-skin/"
     },
-    "51898": {
-      "title": "Lost in Translation",
-      "link": "/film/lost-in-translation/"
+    "1013666": {
+      "title": "Bride Hard",
+      "link": "/film/bride-hard/"
     },
-    "1357758": {
-      "title": "Slugs",
-      "link": "/film/slugs-2025/"
+    "1024562": {
+      "title": "Materialists",
+      "link": "/film/materialists/"
+    },
+    "470671": {
+      "title": "Ballerina",
+      "link": "/film/ballerina-2025/"
     },
     "502622": {
       "title": "Final Destination Bloodlines",
@@ -1752,10 +1848,6 @@
     "887653": {
       "title": "Thunderbolts*",
       "link": "/film/thunderbolts/"
-    },
-    "1116600": {
-      "title": "Sinners",
-      "link": "/film/sinners-2025/"
     },
     "1323005": {
       "title": "The Call",
@@ -1928,18 +2020,6 @@
     "1001285": {
       "title": "Abigail",
       "link": "/film/abigail-2024/"
-    },
-    "948553": {
-      "title": "My First Film",
-      "link": "/film/my-first-film-2024/"
-    },
-    "1143900": {
-      "title": "The Text",
-      "link": "/film/the-text-2024/"
-    },
-    "834656": {
-      "title": "Civil War",
-      "link": "/film/civil-war-2024/"
     },
     "469158": {
       "title": "Kraven the Hunter",
@@ -2221,10 +2301,6 @@
       "title": "Cars 3",
       "link": "/film/cars-3/"
     },
-    "328538": {
-      "title": "The Florida Project",
-      "link": "/film/the-florida-project/"
-    },
     "218738": {
       "title": "The Bye Bye Man",
       "link": "/film/the-bye-bye-man/"
@@ -2265,6 +2341,10 @@
       "title": "Tangled",
       "link": "/film/tangled-2010/"
     },
+    "45120": {
+      "title": "Mamma Mia!",
+      "link": "/film/mamma-mia/"
+    },
     "47776": {
       "title": "Superbad",
       "link": "/film/superbad/"
@@ -2304,22 +2384,6 @@
     "51994": {
       "title": "Heat",
       "link": "/film/heat-1995/"
-    },
-    "51551": {
-      "title": "Apollo 13",
-      "link": "/film/apollo-13/"
-    },
-    "51543": {
-      "title": "To Die For",
-      "link": "/film/to-die-for/"
-    },
-    "47677": {
-      "title": "The Lion King",
-      "link": "/film/the-lion-king/"
-    },
-    "47119": {
-      "title": "The Nightmare Before Christmas",
-      "link": "/film/the-nightmare-before-christmas/"
     }
   }
 }
