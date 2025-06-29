@@ -45,12 +45,41 @@ def scrape_letterboxd_data(usernames=['samuelmgaines', 'embrune', 'devinbaron', 
                 })
 
     # Save to JSON
-    with open('api/data.json', 'w') as f:
+    with open('api/data/scrape.json', 'w') as f:
         json.dump(data, f, indent=2)
+
+def compute_film_stats():
+    with open('api/data/scrape.json', 'r') as f:
+        data = json.load(f)
+
+    stats = {}
+    for username, reviews in data['users'].items():
+        for review in reviews:
+            film_id = review['film_id']
+            rating = review['rating']
+            if film_id not in stats:
+                stats[film_id] = {
+                    'num_watches': 0,
+                    'average_rating': 0,
+                    'ratings': [],
+                    'film_info': {
+                        'title': data['films'][film_id]['title'],
+                        'link': data['films'][film_id]['link']
+                    }
+                }
+            stats[film_id]['num_watches'] += 1
+            stats[film_id]['ratings'].append({'username': username, 'rating': rating})
+            stats[film_id]['average_rating'] = sum([x['rating'] for x in stats[film_id]['ratings']]) / stats[film_id]['num_watches']
+
+    # Save stats to JSON
+    with open('api/data/film_stats.json', 'w') as f:
+        json.dump(stats, f, indent=2)
 
 def main():
     scrape_letterboxd_data()
-    print("Data scraped and saved to api/data.json")
+    print("Data scraped and saved to api/data/scrape.json")
+    compute_film_stats()
+    print("Stats computed and saved to api/data/film_stats.json")
 
 if __name__ == "__main__":
     main()
