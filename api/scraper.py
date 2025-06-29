@@ -1,7 +1,8 @@
 # api/scraper.py
+from bs4 import BeautifulSoup
 import json
 import requests
-from bs4 import BeautifulSoup
+import time
 
 def convert_stars_to_number(stars):
     if not stars:
@@ -13,7 +14,12 @@ def convert_stars_to_number(stars):
 def scrape_letterboxd_data(usernames=['samuelmgaines', 'embrune', 'devinbaron', 'Martendo24680', 'stephaniebrown2', 'nkilpatrick']):
     data = {"users": {username: [] for username in usernames}, "films": {}}
 
-    for username in usernames:
+    for i, username in enumerate(usernames):
+        # Delay to avoid hitting the server too quickly
+        if i > 0:
+            time.sleep(5)
+
+        # FIXME: go through pages
         url = f"https://letterboxd.com/{username}/films/"
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
