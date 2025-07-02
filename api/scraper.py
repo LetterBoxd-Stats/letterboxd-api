@@ -56,8 +56,6 @@ def scrape_letterboxd_users_data(usernames=['samuelmgaines', 'embrune', 'devinba
     data = {"users": {username: [] for username in usernames}, "films": {}}
 
     for i, username in enumerate(usernames):
-
-        # FIXME: go through pages
         page_num = 1
         while page_num > 0:
             time.sleep(15)  # Sleep to avoid hitting the server too hard
