@@ -1,6 +1,7 @@
 # api/scraper.py
 from bs4 import BeautifulSoup
 import json
+import logging
 import requests
 import time
 
@@ -59,7 +60,7 @@ def scrape_letterboxd_users_data(usernames=['samuelmgaines', 'embrune', 'devinba
         page_num = 1
         while page_num > 0:
             time.sleep(15)  # Sleep to avoid hitting the server too hard
-            print(f"Scraping {username} page {page_num}")
+            logging.info(f"Scraping {username} page {page_num}")
             next_page = scrape_letterboxd_page(data, username, page_num)
             if next_page: page_num += 1
             else: break
@@ -96,10 +97,11 @@ def compute_film_stats():
         json.dump(stats, f, indent=2)
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     scrape_letterboxd_users_data()
-    print("Data scraped and saved to api/data/scrape.json")
+    logging.info("Data scraped and saved to api/data/scrape.json")
     compute_film_stats()
-    print("Stats computed and saved to api/data/film_stats.json")
+    logging.info("Stats computed and saved to api/data/film_stats.json")
 
 if __name__ == "__main__":
     main()
