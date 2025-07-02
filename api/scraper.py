@@ -11,44 +11,60 @@ def convert_stars_to_number(stars):
     half_stars = stars.count('½')
     return full_stars + 0.5 * half_stars
 
-def scrape_letterboxd_data(usernames=['samuelmgaines', 'embrune', 'devinbaron', 'Martendo24680', 'stephaniebrown2', 'nkilpatrick']):
+def extract_film_data(data, div):
+        film_id = div['data-film-id'] if div and 'data-film-id' in div.attrs else None
+        if film_id is None:
+            return False
+        if film_id not in data['films']:
+            film_title = div.find('img')['alt'] if div else None
+            film_link = div['data-target-link'] if div and 'data-target-link' in div.attrs else None
+            data['films'][film_id] = {
+                'title': film_title,
+                'link': film_link
+            }
+        return film_id
+
+def extract_user_review(data, review, film_id, username):
+    rating_span = review.select_one('p.poster-viewingdata span.rating')
+    stars = rating_span.text.strip() if rating_span else None
+    rating = convert_stars_to_number(stars)
+    if rating is not None:
+        data['users'][username].append({
+            'film_id': film_id,
+            'rating': rating
+        })
+
+# returns True if there is another page
+def scrape_letterboxd_page(data, username, page_num):
+    url = f"https://letterboxd.com/{username}/films/page/{page_num}/"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    reviews = soup.select('.poster-container')
+    for review in reviews:
+        div = review.select_one('div.linked-film-poster')
+
+        # Extract film data
+        film_id = extract_film_data(data, div)
+        if film_id is not False:
+            extract_user_review(data, review, film_id, username)
+    
+    # Check if there is a next page
+    next_page = soup.select_one('div.pagination a.next')
+    return (next_page is not None)
+
+def scrape_letterboxd_users_data(usernames=['samuelmgaines', 'embrune', 'devinbaron', 'Martendo24680', 'stephaniebrown2', 'nkilpatrick']):
     data = {"users": {username: [] for username in usernames}, "films": {}}
 
     for i, username in enumerate(usernames):
-        # Delay to avoid hitting the server too quickly
-        if i > 0:
-            time.sleep(5)
 
         # FIXME: go through pages
-        url = f"https://letterboxd.com/{username}/films/"
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        reviews = soup.select('.poster-container')
-        for review in reviews:
-            div = review.select_one('div.linked-film-poster')
-
-            # Extract film data
-            film_id = div['data-film-id'] if div and 'data-film-id' in div.attrs else None
-            if film_id is None:
-                continue
-            if film_id not in data['films']:
-                film_title = div.find('img')['alt'] if div else None
-                film_link = div['data-target-link'] if div and 'data-target-link' in div.attrs else None
-                data['films'][film_id] = {
-                    'title': film_title,
-                    'link': film_link
-                }
-            
-            # Extract user review
-            rating_span = review.select_one('p.poster-viewingdata span.rating')
-            stars = rating_span.text.strip() if rating_span else None
-            rating = convert_stars_to_number(stars)
-            if rating is not None:
-                data['users'][username].append({
-                    'film_id': film_id,
-                    'rating': rating
-                })
+        page_num = 1
+        while page_num > 0:
+            time.sleep(15)  # Sleep to avoid hitting the server too hard
+            print(f"Scraping {username} page {page_num}")
+            next_page = scrape_letterboxd_page(data, username, page_num)
+            if next_page: page_num += 1
+            else: break
 
     # Save to JSON
     with open('api/data/scrape.json', 'w') as f:
@@ -82,7 +98,7 @@ def compute_film_stats():
         json.dump(stats, f, indent=2)
 
 def main():
-    scrape_letterboxd_data()
+    scrape_letterboxd_users_data()
     print("Data scraped and saved to api/data/scrape.json")
     compute_film_stats()
     print("Stats computed and saved to api/data/film_stats.json")
