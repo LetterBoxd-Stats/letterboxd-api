@@ -1,7 +1,10 @@
 # api/scraper.py
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 import json
 import logging
+import os
+from pymongo import MongoClient
 import requests
 import time
 
@@ -30,10 +33,9 @@ def extract_user_review(data, review, film_id, username):
     stars = rating_span.text.strip() if rating_span else None
     rating = convert_stars_to_number(stars)
     if rating is not None:
-        data['users'][username].append({
-            'film_id': film_id,
+        data['users'][username]['reviews'][film_id] = {
             'rating': rating
-        })
+        }
 
 # returns True if there is another page
 def scrape_letterboxd_page(data, username, page_num):
@@ -53,30 +55,52 @@ def scrape_letterboxd_page(data, username, page_num):
     next_page = soup.select_one('div.pagination a.next')
     return (next_page is not None)
 
-def scrape_letterboxd_users_data(usernames=['samuelmgaines', 'embrune', 'devinbaron', 'Martendo24680', 'stephaniebrown2', 'nkilpatrick']):
-    data = {"users": {username: [] for username in usernames}, "films": {}}
+def scrape_letterboxd_users_data(db,
+                                 users_collection_name,
+                                 films_collection_name,
+                                 usernames=['samuelmgaines', 'embrune', 'devinbaron', 'Martendo24680', 'stephaniebrown2', 'nkilpatrick']):
+    data = {"users": {username: {"reviews": {}} for username in usernames}, "films": {}}
 
     for i, username in enumerate(usernames):
         page_num = 1
         while page_num > 0:
+            logging.info(f"Scraping {username} page {page_num}...")
             time.sleep(15)  # Sleep to avoid hitting the server too hard
-            logging.info(f"Scraping {username} page {page_num}")
             next_page = scrape_letterboxd_page(data, username, page_num)
             if next_page: page_num += 1
             else: break
-
-    # Save to JSON
-    with open('api/data/scrape.json', 'w') as f:
-        json.dump(data, f, indent=2)
+    
+    # Upload to MongoDB
+    logging.info("Uploading scraped data to MongoDB...")
+    users_collection = db[users_collection_name]
+    films_collection = db[films_collection_name]
+    for username, user_data in data['users'].items():
+        users_collection.replace_one(
+            {"username": username},  # Match condition
+            {"username": username, "reviews": user_data['reviews']},  # Replacement document
+            upsert=True
+        )
+    for film_id, film_data in data['films'].items():
+        films_collection.replace_one(
+            {"film_id": film_id},  # Match condition
+            {
+                "film_id": film_id,
+                "film_title": film_data['title'],
+                "film_link": film_data['link']
+            },
+            upsert=True
+        )
+    
+    logging.info("Data scraped and saved to database")
 
 def compute_film_stats():
     with open('api/data/scrape.json', 'r') as f:
         data = json.load(f)
 
     stats = {}
-    for username, reviews in data['users'].items():
-        for review in reviews:
-            film_id = review['film_id']
+    for username, info in data['users'].items():
+        reviews = info['reviews']
+        for film_id, review in reviews.items():
             rating = review['rating']
             if film_id not in stats:
                 stats[film_id] = {
@@ -97,11 +121,26 @@ def compute_film_stats():
         json.dump(stats, f, indent=2)
 
 def main():
-    logging.basicConfig(level=logging.INFO)
-    scrape_letterboxd_users_data()
-    logging.info("Data scraped and saved to api/data/scrape.json")
-    compute_film_stats()
-    logging.info("Stats computed and saved to api/data/film_stats.json")
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # Load environment variables
+    load_dotenv()
+
+    # MongoDB configuration
+    logging.info("Connecting to MongoDB...")
+    mongo_uri = os.getenv('DB_URI')
+    db_name = os.getenv('DB_NAME')
+    users_collection_name = os.getenv('DB_USERS_COLLECTION')
+    films_collection_name = os.getenv('DB_FILMS_COLLECTION')
+    client = MongoClient(mongo_uri)
+    db = client[db_name]
+    logging.info("Connected to MongoDB")
+
+    scrape_letterboxd_users_data(db, users_collection_name, films_collection_name)
+    
+    # compute_film_stats()
+    # logging.info("Stats computed and saved to api/data/film_stats.json")
 
 if __name__ == "__main__":
     main()
