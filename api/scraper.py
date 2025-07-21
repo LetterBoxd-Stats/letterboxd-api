@@ -62,10 +62,7 @@ def scrape_letterboxd_page(data, username, page_num):
     next_page = soup.select_one('div.pagination a.next')
     return (next_page is not None)
 
-def scrape_letterboxd_users_data(db,
-                                 users_collection_name,
-                                 films_collection_name,
-                                 usernames=['samuelmgaines', 'embrune', 'devinbaron', 'Martendo24680', 'stephaniebrown2', 'nkilpatrick']):
+def scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames):
     data = {"users": {username: {"reviews": {}, "watches": {}} for username in usernames}, "films": {}}
 
     for i, username in enumerate(usernames):
@@ -150,7 +147,11 @@ def main():
     db = client[db_name]
     logging.info("Connected to MongoDB")
 
-    scrape_letterboxd_users_data(db, users_collection_name, films_collection_name)
+    # Get usernames from environment variable
+    usernames = os.getenv('LETTERBOXD_USERNAMES', '').split(',')
+    print(usernames)
+
+    scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames)
 
     # compute_film_stats()
     # logging.info("Stats computed and saved to api/data/film_stats.json")
