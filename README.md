@@ -151,7 +151,7 @@ If you're setting this up in your own GitHub repo, ensure the `.github/workflows
 
 ### 2. Add required secret
 
-Go to **Settings → Secrets and variables → Actions** in your GitHub repo, and add the following secret:
+Go to **Settings → Secrets and variables → Actions** in your GitHub repo, and add the following repository secret:
 
 | Secret Name      | Description                                                       |
 | ---------------- | ----------------------------------------------------------------- |
@@ -159,11 +159,11 @@ Go to **Settings → Secrets and variables → Actions** in your GitHub repo, an
 
 ### 3. Confirm the schedule
 
-The default schedule is defined using cron syntax in the workflow file. For example:
+The schedule is defined using cron syntax in the workflow file:
 
 ```yaml
 schedule:
-    - cron: "0 4 * * *" # Runs every day at 4:00 AM UTC
+    - cron: '0 8 * * *' # runs every day at 8:00 AM UTC (2:00 AM CST / 3:00 AM CDT)
 ```
 
 ## Logging
