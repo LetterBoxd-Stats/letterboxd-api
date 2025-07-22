@@ -150,7 +150,7 @@ def main():
     # Get usernames from environment variable
     usernames = os.getenv('LETTERBOXD_USERNAMES', '').split(',')
 
-    scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, ['samuelmgaines'])
+    scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames)
 
 if __name__ == "__main__":
     main()

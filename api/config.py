@@ -6,7 +6,7 @@ import os
 load_dotenv()
 
 # Optional: pull environment-specific config
-ENV = os.getenv('ENV', 'production')
+ENV = os.getenv('ENV')
 LETTERBOXD_USERNAMES = os.getenv('LETTERBOXD_USERNAMES', '').split(',')
 DB_URI = os.getenv('DB_URI')
 DB_NAME = os.getenv('DB_NAME')
