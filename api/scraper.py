@@ -25,7 +25,7 @@ def extract_film_data(data, div):
             film_link = div['data-target-link'] if div and 'data-target-link' in div.attrs else None
             data['films'][film_id] = {
                 'title': film_title,
-                'link': film_link
+                'link': 'letterboxd.com' + film_link
             }
         return film_id
 
@@ -150,7 +150,7 @@ def main():
     # Get usernames from environment variable
     usernames = os.getenv('LETTERBOXD_USERNAMES', '').split(',')
 
-    scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames)
+    scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, ['samuelmgaines'])
 
 if __name__ == "__main__":
     main()
