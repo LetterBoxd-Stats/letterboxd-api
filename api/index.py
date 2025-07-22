@@ -2,11 +2,12 @@ from flask import Flask
 import logging
 import os
 from pymongo import MongoClient
-from scraper import scrape_letterboxd_users_data
 import sys
 
 sys.path.append(os.path.dirname(__file__))  # Add /api to sys.path
 import config
+from scraper import scrape_letterboxd_users_data
+
 config.configure_logging()
 logger = logging.getLogger(__name__)
 
