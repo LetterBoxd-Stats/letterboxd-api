@@ -103,33 +103,6 @@ def scrape_letterboxd_users_data(db, users_collection_name, films_collection_nam
     
     logging.info("Data scraped and saved to database")
 
-def compute_film_stats():
-    with open('api/data/scrape.json', 'r') as f:
-        data = json.load(f)
-
-    stats = {}
-    for username, info in data['users'].items():
-        reviews = info['reviews']
-        for film_id, review in reviews.items():
-            rating = review['rating']
-            if film_id not in stats:
-                stats[film_id] = {
-                    'num_watches': 0,
-                    'average_rating': 0,
-                    'ratings': [],
-                    'film_info': {
-                        'title': data['films'][film_id]['title'],
-                        'link': data['films'][film_id]['link']
-                    }
-                }
-            stats[film_id]['num_watches'] += 1
-            stats[film_id]['ratings'].append({'username': username, 'rating': rating})
-            stats[film_id]['average_rating'] = sum([x['rating'] for x in stats[film_id]['ratings']]) / stats[film_id]['num_watches']
-
-    # Save stats to JSON
-    with open('api/data/film_stats.json', 'w') as f:
-        json.dump(stats, f, indent=2)
-
 def main():
     # Configure logging
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
