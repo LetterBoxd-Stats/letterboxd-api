@@ -1,28 +1,191 @@
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fexamples%2Ftree%2Fmain%2Fpython%2Fflask3&demo-title=Flask%203%20%2B%20Vercel&demo-description=Use%20Flask%203%20on%20Vercel%20with%20Serverless%20Functions%20using%20the%20Python%20Runtime.&demo-url=https%3A%2F%2Fflask3-python-template.vercel.app%2F&demo-image=https://assets.vercel.com/image/upload/v1669994156/random/flask.png)
+# Letterboxd API
 
-# Flask + Vercel
+This is a Flask-based API for scraping and storing [Letterboxd](https://letterboxd.com) user review data. It supports scheduled or manual scraping, stores results in MongoDB, and exposes public film and user data via HTTP endpoints.
 
-This example shows how to use Flask 3 on Vercel with Serverless Functions using the [Python Runtime](https://vercel.com/docs/concepts/functions/serverless-functions/runtimes/python).
+Deployed on [Vercel](https://vercel.com), and configurable via environment variables.
 
-## Demo
+---
 
-https://flask-python-template.vercel.app/
+## Endpoints
 
-## How it Works
+### `GET /`
 
-This example uses the Web Server Gateway Interface (WSGI) with Flask to enable handling requests on Vercel with Serverless Functions.
+Returns a simple greeting.
 
-## Running Locally
+### `GET /films`
 
-```bash
-npm i -g vercel
-vercel dev
+Returns all scraped film entries:
+
+```json
+[
+	{
+		"film_id": "34722",
+		"film_link": "letterboxd.com/film/inception/",
+		"film_title": "Inception"
+	},
+	{
+		"film_id": "51621",
+		"film_link": "letterboxd.com/film/good-will-hunting/",
+		"film_title": "Good Will Hunting"
+	}
+]
 ```
 
-Your Flask application is now available at `http://localhost:3000`.
+### `GET /films/{film_id}`
 
-## One-Click Deploy
+Returns the film entry for the specified `film_id`:
 
-Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=vercel-examples):
+```json
+{
+	"film_id": "34722",
+	"film_title": "Inception",
+	"film_link": "letterboxd.com/film/inception/"
+}
+```
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fexamples%2Ftree%2Fmain%2Fpython%2Fflask3&demo-title=Flask%203%20%2B%20Vercel&demo-description=Use%20Flask%203%20on%20Vercel%20with%20Serverless%20Functions%20using%20the%20Python%20Runtime.&demo-url=https%3A%2F%2Fflask3-python-template.vercel.app%2F&demo-image=https://assets.vercel.com/image/upload/v1669994156/random/flask.png)
+### `POST /scrape`
+
+Triggers scraping for the usernames defined in the `LETTERBOXD_USERNAMES` environment variable. Results are saved to MongoDB.
+
+### `GET /users`
+
+Returns all users and their scraped review data:
+
+```json
+[
+	{
+		"username": "samuelmgaines",
+		"last_update_time": "Tue, 22 Jul 2025 05:09:48 GMT",
+		"reviews": {
+			"34722": {
+				"rating": 4.5,
+				"is_liked": false
+			}
+		},
+		"watches": {
+			"51621": {
+				"is_liked": true
+			}
+		}
+	}
+]
+```
+
+### `GET /users/{username}`
+
+Returns the user with the specified `username` and their scraped review data:
+
+```json
+{
+	"username": "samuelmgaines",
+	"last_update_time": "Tue, 22 Jul 2025 05:09:48 GMT",
+	"reviews": {
+		"34772": {
+			"rating": 4.5,
+			"is_liked": false
+		}
+	},
+	"watches": {
+		"51621": {
+			"is_liked": true
+		}
+	}
+}
+```
+
+## Environment Variables
+
+These variables are loaded via dotenv for local development and should also be added to your Vercel project settings for production.
+
+| Secret Name            | Description                                 |
+| ---------------------- | ------------------------------------------- |
+| `DB_URI`               | MongoDB connection URI                      |
+| `DB_NAME`              | MongoDB database name                       |
+| `DB_USERS_COLLECTION`  | Collection name for user reviews            |
+| `DB_FILMS_COLLECTION`  | Collection name for film metadata           |
+| `LETTERBOXD_USERNAMES` | Comma-separated list of usernames to scrape |
+| `ENV`                  | Set to `prod` or `dev`                      |
+
+## Local Development
+
+1. Clone the repo
+
+2. Set up a virtual environment:
+
+```bash
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+```
+
+3. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+4. Run the server:
+
+```bash
+python api/index.py
+```
+
+## Deployment (Vercel)
+
+-   Code is located in the `api/` directory as required by Vercel for Python APIs.
+
+-   Add environment variables in the Vercel dashboard.
+
+-   Vercel automatically installs dependencies from `requirements.txt` at the root directory.
+
+## Scraping
+
+Scraping is triggered manually via the `POST /scrape` endpoint.
+
+Additionally, this project includes a preconfigured GitHub Actions workflow that automatically triggers the `/scrape` endpoint on a schedule (see `.github/workflows/scrape.yml`).
+
+To enable it:
+
+### 1. Fork or clone the repository
+
+If you're setting this up in your own GitHub repo, ensure the `.github/workflows/scrape.yml` file exists.
+
+### 2. Add required secret
+
+Go to **Settings → Secrets and variables → Actions** in your GitHub repo, and add the following secret:
+
+| Secret Name      | Description                                                       |
+| ---------------- | ----------------------------------------------------------------- |
+| `DEPLOYMENT_URL` | Your deployed app's full URL (e.g. `https://your-app.vercel.app`) |
+
+### 3. Confirm the schedule
+
+The default schedule is defined using cron syntax in the workflow file. For example:
+
+```yaml
+schedule:
+    - cron: "0 4 * * *" # Runs every day at 4:00 AM UTC
+```
+
+## Logging
+
+Logs are handled using Python's `logging` module and will appear in:
+
+-   Your terminal (local dev)
+-   Vercel logs (production)
+
+## Project Structure
+
+```bash
+.github/
+├──workflows/
+    ├── scrape.yml     # Scrape scheduler (GitHub Actions)
+api/
+├── index.py           # Flask app and endpoints
+├── scraper.py         # Letterboxd scraping logic
+├── config.py          # Logging and environment loading
+.env
+.gitignore
+README.md
+requirements.txt
+vercel.json
+```

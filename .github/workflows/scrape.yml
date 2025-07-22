@@ -10,4 +10,4 @@ jobs:
         steps:
             - name: Trigger the scrape endpoint
               run: |
-                  curl -X POST https://letterboxd-api-zeta.vercel.app/films
+                  curl -X POST ${{ secrets.DEPLOYMENT_URL }}/scrape

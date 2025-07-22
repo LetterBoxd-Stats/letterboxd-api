@@ -41,7 +41,7 @@ def films():
         films_collection = db[films_collection_name]
         films = list(films_collection.find({}, {'_id': 0}))
         logger.info(f"Fetched {len(films)} films from database.")
-        return {'films': films}
+        return films
     except Exception as e:
         return {'error': str(e)}, 500
 
@@ -54,7 +54,7 @@ def film(film_id):
         film = films_collection.find_one({'film_id': film_id}, {'_id': 0})
         if film:
             logger.info(f"Fetched film with ID '{film_id}' from database.")
-            return {'film': film}
+            return film
         else:
             logger.warning(f"Film with ID '{film_id}' not found.")
             return {'error': 'Film not found'}, 404
@@ -79,7 +79,7 @@ def users():
         users_collection = db[users_collection_name]
         users = list(users_collection.find({}, {'_id': 0}))
         logger.info(f"Fetched {len(users)} users from database.")
-        return {'users': users}
+        return users
     except Exception as e:
         return {'error': str(e)}, 500
 
@@ -92,7 +92,7 @@ def user(username):
         user = users_collection.find_one({'username': username}, {'_id': 0})
         if user:
             logger.info(f"Fetched user '{username}' from database.")
-            return {'user': user}
+            return user
         else:
             logger.warning(f"User '{username}' not found.")
             return {'error': 'User not found'}, 404
