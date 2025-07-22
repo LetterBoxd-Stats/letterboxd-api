@@ -1,0 +1,13 @@
+name: Scrape Trigger
+
+on:
+    schedule:
+        - cron: "0 8 * * *" # runs every day at 8:00 AM UTC (2:00 AM CST / 3:00 AM CDT)
+
+jobs:
+    call_scrape:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Trigger the scrape endpoint
+              run: |
+                  curl -X POST https://letterboxd-api-zeta.vercel.app/films

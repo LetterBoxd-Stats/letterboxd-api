@@ -152,8 +152,5 @@ def main():
 
     scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames)
 
-    # compute_film_stats()
-    # logging.info("Stats computed and saved to api/data/film_stats.json")
-
 if __name__ == "__main__":
     main()
