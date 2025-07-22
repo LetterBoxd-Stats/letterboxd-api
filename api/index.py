@@ -46,7 +46,18 @@ def films():
         return {'films': films}
     except Exception as e:
         return {'error': str(e)}, 500
-    
+
+@app.route('/users')
+def users():
+    # Connect to MongoDB
+    try:
+        db, users_collection_name, _films_collection_name = connect_to_db()
+        users_collection = db[users_collection_name]
+        # Fetch all users
+        users = list(users_collection.find({}, {'_id': 0}))  # Exclude MongoDB's default _id field
+        return {'users': users}
+    except Exception as e:
+        return {'error': str(e)}, 500
 
 if __name__ == '__main__':
     import os
