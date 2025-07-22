@@ -141,7 +141,7 @@ python api/index.py
 
 Scraping is triggered manually via the `POST /scrape` endpoint.
 
-Additionally, this project includes a preconfigured GitHub Actions workflow that automatically triggers the `/scrape` endpoint on a schedule (see `.github/workflows/scrape.yml`).
+Additionally, this project includes a preconfigured GitHub Actions workflow that automatically triggers the `/scrape` endpoint on a schedule (see `.github/workflows/scrape.yml`). This GitHub Action can also be run manually through the GitHub GUI.
 
 To enable it:
 
