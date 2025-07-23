@@ -43,10 +43,6 @@ Returns the film entry for the specified `film_id`:
 }
 ```
 
-### `POST /scrape`
-
-Triggers scraping for the usernames defined in the `LETTERBOXD_USERNAMES` environment variable. Results are saved to MongoDB.
-
 ### `GET /users`
 
 Returns all users and their scraped review data:
@@ -95,7 +91,7 @@ Returns the user with the specified `username` and their scraped review data:
 
 ## Environment Variables
 
-These variables are loaded via dotenv for local development and should also be added to your Vercel project settings for production.
+These variables are loaded via dotenv for local development and should also be added to both your Vercel project settings and your GitHub Action repository secrets for production.
 
 | Secret Name            | Description                                 |
 | ---------------------- | ------------------------------------------- |
@@ -139,31 +135,13 @@ python api/index.py
 
 ## Scraping
 
-Scraping is triggered manually via the `POST /scrape` endpoint.
-
-Additionally, this project includes a preconfigured GitHub Actions workflow that automatically triggers the `/scrape` endpoint on a schedule (see `.github/workflows/scrape.yml`). This GitHub Action can also be run manually through the GitHub GUI.
-
-To enable it:
-
-### 1. Fork or clone the repository
-
-If you're setting this up in your own GitHub repo, ensure the `.github/workflows/scrape.yml` file exists.
-
-### 2. Add required secret
-
-Go to **Settings → Secrets and variables → Actions** in your GitHub repo, and add the following repository secret:
-
-| Secret Name      | Description                                                       |
-| ---------------- | ----------------------------------------------------------------- |
-| `DEPLOYMENT_URL` | Your deployed app's full URL (e.g. `https://your-app.vercel.app`) |
-
-### 3. Confirm the schedule
+This project includes a preconfigured GitHub Actions workflow that automatically triggers the scraper a schedule (see `.github/workflows/scrape.yml`). This GitHub Action can also be triggered manually through the GitHub GUI. If you're setting this up in your own GitHub repo, ensure your GitHub repository secrets are configured.
 
 The schedule is defined using cron syntax in the workflow file:
 
 ```yaml
 schedule:
-    - cron: '0 8 * * *' # runs every day at 8:00 AM UTC (2:00 AM CST / 3:00 AM CDT)
+    - cron: "0 8 * * *" # runs every day at 8:00 AM UTC (2:00 AM CST / 3:00 AM CDT)
 ```
 
 ## Logging

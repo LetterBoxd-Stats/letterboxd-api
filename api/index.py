@@ -6,7 +6,6 @@ import sys
 
 sys.path.append(os.path.dirname(__file__))  # Add /api to sys.path
 import config
-from scraper import scrape_letterboxd_users_data
 
 config.configure_logging()
 logger = logging.getLogger(__name__)
@@ -58,16 +57,6 @@ def film(film_id):
         else:
             logger.warning(f"Film with ID '{film_id}' not found.")
             return {'error': 'Film not found'}, 404
-    except Exception as e:
-        return {'error': str(e)}, 500
-
-@app.route('/scrape', methods=['POST'])
-def scrape():
-    try:
-        db, users_collection_name, films_collection_name = connect_to_db()
-        usernames = config.LETTERBOXD_USERNAMES
-        scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames)
-        return {'message': 'Scraping completed successfully'}
     except Exception as e:
         return {'error': str(e)}, 500
 

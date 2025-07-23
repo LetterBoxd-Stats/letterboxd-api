@@ -2,7 +2,6 @@
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-import json
 import logging
 import os
 from pymongo import MongoClient
@@ -123,6 +122,7 @@ def main():
     # Get usernames from environment variable
     usernames = os.getenv('LETTERBOXD_USERNAMES', '').split(',')
 
+    # Scrape data
     scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames)
 
 if __name__ == "__main__":
