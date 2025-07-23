@@ -1,4 +1,4 @@
-name: Scrape Trigger
+name: Scrape
 
 on:
     schedule:
