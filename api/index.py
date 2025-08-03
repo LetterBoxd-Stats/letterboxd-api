@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_cors import CORS
 import logging
 import os
 from pymongo import MongoClient
@@ -11,6 +12,14 @@ config.configure_logging()
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Configure allowed origins
+if config.ENV == 'dev':
+    allowed_origins = "*"  # Allow all in development
+else:
+    allowed_origins = [config.FRONTEND_URL]  # Replace with your actual domain
+
+CORS(app, resources={r"/*": {"origins": allowed_origins}})
 
 # ============================
 # Helper Functions

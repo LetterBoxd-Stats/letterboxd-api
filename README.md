@@ -101,6 +101,7 @@ These variables are loaded via dotenv for local development and should also be a
 | `DB_FILMS_COLLECTION`  | Collection name for film metadata           |
 | `LETTERBOXD_USERNAMES` | Comma-separated list of usernames to scrape |
 | `ENV`                  | Set to `prod` or `dev`                      |
+| `FRONTEND_URL`         | The URL of your production frontend         |
 
 ## Local Development
 
