@@ -24,7 +24,7 @@ def extract_film_data(data, div):
             film_link = div['data-target-link'] if div and 'data-target-link' in div.attrs else None
             data['films'][film_id] = {
                 'title': film_title,
-                'link': 'letterboxd.com' + film_link
+                'link': 'https://letterboxd.com' + film_link
             }
         return film_id
 
