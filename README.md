@@ -1,6 +1,6 @@
 # Letterboxd API
 
-This is a Flask-based API for scraping and storing [Letterboxd](https://letterboxd.com) user review data. It supports scheduled or manual scraping, stores results in MongoDB, and exposes public film and user data via HTTP endpoints.
+This is a Flask-based API for scraping and storing [Letterboxd](https://letterboxd.com) user review data. It supports scheduled and manual scraping, stores results in MongoDB, and exposes public film and user data via HTTP endpoints.
 
 Deployed on [Vercel](https://vercel.com), and configurable via environment variables.
 
@@ -136,7 +136,7 @@ python api/index.py
 
 ## Scraping
 
-This project includes a preconfigured GitHub Actions workflow that automatically triggers the scraper a schedule (see `.github/workflows/scrape.yml`). This GitHub Action can also be triggered manually through the GitHub GUI. If you're setting this up in your own GitHub repo, ensure your GitHub repository secrets are configured.
+This project includes a preconfigured GitHub Actions workflow that automatically triggers the scraper on a schedule (see `.github/workflows/scrape.yml`). This GitHub Action can also be triggered manually through the GitHub GUI. If you're setting this up in your own GitHub repo, ensure your GitHub repository secrets are configured.
 
 The schedule is defined using cron syntax in the workflow file:
 
@@ -157,14 +157,14 @@ Logs are handled using Python's `logging` module and will appear in:
 ```bash
 .github/
 ├──workflows/
-    ├── scrape.yml     # Scrape scheduler (GitHub Actions)
+    ├── scrape.yml     # Scrape action configuration
 api/
 ├── index.py           # Flask app and endpoints
-├── scraper.py         # Letterboxd scraping logic
 ├── config.py          # Logging and environment loading
-.env
+.env                   # Local environment variables (not in repository)
 .gitignore
 README.md
 requirements.txt
+scraper.py             # Scraping functionality
 vercel.json
 ```
