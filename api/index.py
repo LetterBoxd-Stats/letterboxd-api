@@ -17,7 +17,7 @@ app = Flask(__name__)
 if config.ENV == 'dev':
     allowed_origins = "*"  # Allow all in development
 else:
-    allowed_origins = [config.FRONTEND_URL]  # Replace with your actual domain
+    allowed_origins = [config.FRONTEND_URL]
 
 CORS(app, resources={r"/*": {"origins": allowed_origins}})
 
