@@ -1,41 +1,41 @@
-Babel @ file:///pub/devel/python/python-babel/python-babel-2.12.1-1.noarch/build/dist/Babel-2.12.1-py3-none-any.whl
+Babel==2.12.1
 beautifulsoup4==4.13.4
 blinker==1.9.0
 bs4==0.0.2
-chardet @ file:///pub/devel/python/python-chardet/python-chardet-4.0.0-2.noarch/build/dist/chardet-4.0.0-py2.py3-none-any.whl
+chardet==4.0.0
 charset-normalizer==3.4.2
 click==8.1.8
 dnspython==2.7.0
-docutils @ file:///pub/devel/python/python-docutils/python-docutils-0.18.1-1.noarch/build/dist/docutils-0.18.1-py2.py3-none-any.whl
+docutils==0.18.1
 dotenv==0.9.9
 Flask==3.1.1
 flask-cors==6.0.1
-idna @ file:///pub/devel/python/python-idna/python-idna-3.3-1.noarch/build/dist/idna-3.3-py3-none-any.whl
-imagesize @ file:///pub/devel/python/python-imagesize/python-imagesize-1.3.0-1.noarch/build/dist/imagesize-1.3.0-py2.py3-none-any.whl
+idna==3.3
+imagesize==1.3.0
 importlib_metadata==8.7.0
-iniconfig @ file:///pub/devel/python/python-iniconfig/python-iniconfig-2.0.0-1.noarch/build/dist/iniconfig-2.0.0-py3-none-any.whl
+iniconfig==2.0.0
 itsdangerous==2.2.0
-Jinja2 @ file:///pub/devel/python/python-jinja2/python-jinja2-3.1.2-1.noarch/build/dist/Jinja2-3.1.2-py3-none-any.whl
-MarkupSafe @ file:///pub/devel/python/python-markupsafe/python-markupsafe-2.1.2-1.x86_64/build/dist/MarkupSafe-2.1.2-cp39-cp39-cygwin_3_4_6_x86_64.whl
-olefile @ file:///pub/devel/python/python-olefile/python-olefile-0.46-3.noarch/build/dist/olefile-0.46-py2.py3-none-any.whl
-packaging @ file:///pub/devel/python/python-packaging/python-packaging-21.3-1.noarch/build/dist/packaging-21.3-py3-none-any.whl
-Pillow @ file:///home/Hamis/python-imaging/python-imaging-8.4.0-1.x86_64/build/dist/Pillow-8.4.0-cp39-cp39-cygwin_3_3_3_x86_64.whl
-platformdirs @ file:///pub/devel/python/python-platformdirs/python-platformdirs-4.2.0-1.noarch/build/dist/platformdirs-4.2.0-py3-none-any.whl#sha256=16b309552d060f387afa9d2a27d03f7d817691e43d8f1042d4ecde1f192a1f30
-pluggy @ file:///pub/devel/python/python-pluggy/python-pluggy-1.0.0-1.noarch/build/dist/pluggy-1.0.0-py2.py3-none-any.whl
-Pygments @ file:///pub/devel/python/python-pygments/python-pygments-2.10.0-1.noarch/build/dist/Pygments-2.10.0-py3-none-any.whl
+Jinja2==3.1.2
+MarkupSafe==2.1.2
+olefile==0.46
+packaging==21.3
+Pillow==8.4.0
+platformdirs==4.2.0
+pluggy==1.0.0
+Pygments==2.10.0
 pymongo==4.13.2
-pyparsing @ file:///pub/devel/python/python-pyparsing/python-pyparsing-3.0.6-1.noarch/build/dist/pyparsing-3.0.6-py3-none-any.whl
-pytest @ file:///pub/devel/python/python-pytest/python-pytest-7.3.0-1.noarch/build/dist/pytest-7.3.0-py3-none-any.whl
+pyparsing==3.0.6
+pytest==7.3.0
 python-dotenv==1.1.1
-railroad-diagrams @ file:///pub/devel/python/python-railroad-diagrams/python-railroad-diagrams-3.0.1-1.noarch/build/dist/railroad_diagrams-3.0.1-py3-none-any.whl
-requests @ file:///cygdrive/d/a/scallywag/python-requests/python-requests-2.31.0-1.noarch/build/dist/requests-2.31.0-py3-none-any.whl
-six @ file:///pub/devel/python/python-six/python-six-1.16.0-1.noarch/build/dist/six-1.16.0-py2.py3-none-any.whl
-snowballstemmer @ file:///pub/devel/python/python-snowballstemmer/python-snowballstemmer-2.2.0-1.noarch/build/dist/snowballstemmer-2.2.0-py2.py3-none-any.whl
+railroad-diagrams==3.0.1
+requests==2.31.0
+six==1.16.0
+snowballstemmer==2.2.0
 soupsieve==2.7
-Sphinx @ file:///pub/devel/python/python-sphinx/python-sphinx-4.4.0-1.noarch/build/dist/Sphinx-4.4.0-py3-none-any.whl
-sphinxcontrib-serializinghtml @ file:///pub/devel/python/python-sphinxcontrib-serializinghtml/python-sphinxcontrib-serializinghtml-1.1.5-1.noarch/build/dist/sphinxcontrib_serializinghtml-1.1.5-py2.py3-none-any.whl
-toml @ file:///pub/devel/python/python-toml/python-toml-0.10.2-2.noarch/build/dist/toml-0.10.2-py2.py3-none-any.whl
+Sphinx==4.4.0
+sphinxcontrib-serializinghtml==1.1.5
+toml==0.10.2
 typing_extensions==4.14.0
-urllib3 @ file:///pub/devel/python/python-urllib3/python-urllib3-1.26.7-1.noarch/build/dist/urllib3-1.26.7-py2.py3-none-any.whl
+urllib3==1.26.7
 Werkzeug==3.1.3
 zipp==3.23.0
