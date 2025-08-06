@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
 import os
@@ -40,18 +40,42 @@ def connect_to_db():
 @app.route('/')
 def home():
     return 'Hello, World!'
-
+    
 @app.route('/films')
 def films():
     try:
+        # Connect to DB
         db, _, films_collection_name = connect_to_db()
-        logger.info("Fetching films from database...")
         films_collection = db[films_collection_name]
-        films = list(films_collection.find({}, {'_id': 0}))
-        logger.info(f"Fetched {len(films)} films from database.")
-        return films
+
+        # Get query params for pagination
+        page = int(request.args.get('page', 1))  # default page = 1
+        limit = int(request.args.get('limit', 20))  # default limit = 20
+
+        # Calculate skip for MongoDB
+        skip = (page - 1) * limit
+
+        # Get total count
+        total_films = films_collection.count_documents({})
+
+        # Fetch paginated data
+        films_cursor = films_collection.find({}, {'_id': 0}).skip(skip).limit(limit)
+        films = list(films_cursor)
+
+        # Calculate total pages
+        total_pages = (total_films + limit - 1) // limit  # ceiling division
+
+        # Return paginated response
+        return jsonify({
+            "films": films,
+            "page": page,
+            "per_page": limit,
+            "total_pages": total_pages,
+            "total_films": total_films
+        })
+
     except Exception as e:
-        return {'error': str(e)}, 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/films/<film_id>')
 def film(film_id):

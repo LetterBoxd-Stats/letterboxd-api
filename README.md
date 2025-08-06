@@ -14,21 +14,32 @@ Returns a simple greeting.
 
 ### `GET /films`
 
-Returns all scraped film entries:
+Query Parameters:
+
+-   `page`: integer, optional (defualt 1).
+-   `limit`: integer, optional (default 20). Number of films per page.
+
+Returns a paginated list of scraped film entries:
 
 ```json
-[
-	{
-		"film_id": "34722",
-		"film_link": "letterboxd.com/film/inception/",
-		"film_title": "Inception"
-	},
-	{
-		"film_id": "51621",
-		"film_link": "letterboxd.com/film/good-will-hunting/",
-		"film_title": "Good Will Hunting"
-	}
-]
+{
+	"films": [
+		{
+			"film_id": "34722",
+			"film_link": "letterboxd.com/film/inception/",
+			"film_title": "Inception"
+		},
+		{
+			"film_id": "51621",
+			"film_link": "letterboxd.com/film/good-will-hunting/",
+			"film_title": "Good Will Hunting"
+		}
+	],
+	"page": 1,
+	"per_page": 2,
+	"total_pages": 8,
+	"total_films": 16
+}
 ```
 
 ### `GET /films/{film_id}`
