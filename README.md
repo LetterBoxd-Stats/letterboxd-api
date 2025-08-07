@@ -100,6 +100,8 @@ Returns the user with the specified `username` and their scraped review data:
 }
 ```
 
+---
+
 ## Environment Variables
 
 These variables are loaded via dotenv for local development and should also be added to both your Vercel project settings and your GitHub Action repository secrets for production.
@@ -113,6 +115,8 @@ These variables are loaded via dotenv for local development and should also be a
 | `LETTERBOXD_USERNAMES` | Comma-separated list of usernames to scrape |
 | `ENV`                  | Set to `prod` or `dev`                      |
 | `FRONTEND_URL`         | The URL of your production frontend         |
+
+---
 
 ## Local Development
 
@@ -137,6 +141,8 @@ pip install -r requirements.txt
 python api/index.py
 ```
 
+---
+
 ## Deployment (Vercel)
 
 -   Code is located in the `api/` directory as required by Vercel for Python APIs.
@@ -144,6 +150,8 @@ python api/index.py
 -   Add environment variables in the Vercel dashboard.
 
 -   Vercel automatically installs dependencies from `requirements.txt` at the root directory.
+
+---
 
 ## Scraping
 
@@ -156,12 +164,16 @@ schedule:
     - cron: "0 8 * * *" # runs every day at 8:00 AM UTC (2:00 AM CST / 3:00 AM CDT)
 ```
 
+---
+
 ## Logging
 
 Logs are handled using Python's `logging` module and will appear in:
 
 -   Your terminal (local dev)
 -   Vercel logs (production)
+
+---
 
 ## Project Structure
 

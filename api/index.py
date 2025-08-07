@@ -46,6 +46,7 @@ def films():
     try:
         # Connect to DB
         db, _, films_collection_name = connect_to_db()
+        logger.info("Fetching films from database...")
         films_collection = db[films_collection_name]
 
         # Get query params for pagination
@@ -64,6 +65,9 @@ def films():
 
         # Calculate total pages
         total_pages = (total_films + limit - 1) // limit  # ceiling division
+        if page > total_pages and total_films > 0:
+            return jsonify({'error': 'Page number out of range'}), 400
+        logger.info(f"Fetched {len(films)} films from database.")
 
         # Return paginated response
         return jsonify({
