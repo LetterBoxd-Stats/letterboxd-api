@@ -1,4 +1,3 @@
-# api/scraper.py
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from dotenv import load_dotenv

@@ -1,8 +1,6 @@
-name: Scrape
+name: Compute Stats
 
 on:
-    schedule:
-        - cron: "0 8 * * *" # runs every day at 8:00 AM UTC (2:00 AM CST / 3:00 AM CDT)
     workflow_dispatch: # enables manual triggering
 
 jobs:
@@ -29,10 +27,7 @@ jobs:
                   echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
                   echo "DB_USERS_COLLECTION=${{ secrets.DB_USERS_COLLECTION }}" >> .env
                   echo "DB_FILMS_COLLECTION=${{ secrets.DB_FILMS_COLLECTION }}" >> .env
-                  echo "LETTERBOXD_USERNAMES=${{ secrets.LETTERBOXD_USERNAMES }}" >> .env
                   echo "ENV=${{ secrets.ENV }}" >> .env
 
-            - name: Run scraper
-              run: python scraper.py
             - name: Compute stats
               run: python stats.py
