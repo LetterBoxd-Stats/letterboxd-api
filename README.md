@@ -27,12 +27,22 @@ Returns a paginated list of scraped film entries:
 		{
 			"film_id": "34722",
 			"film_link": "letterboxd.com/film/inception/",
-			"film_title": "Inception"
+			"film_title": "Inception",
+			"avg_rating": 3.75,
+			"like_ratio": 0.25,
+			"num_likes": 1,
+			"num_ratings": 2,
+			"num_watches": 4
 		},
 		{
 			"film_id": "51621",
 			"film_link": "letterboxd.com/film/good-will-hunting/",
-			"film_title": "Good Will Hunting"
+			"film_title": "Good Will Hunting",
+			"avg_rating": 4.5,
+			"like_ratio": 1,
+			"num_likes": 3,
+			"num_ratings": 3,
+			"num_watches": 3
 		}
 	],
 	"page": 1,
@@ -50,7 +60,12 @@ Returns the film entry for the specified `film_id`:
 {
 	"film_id": "34722",
 	"film_title": "Inception",
-	"film_link": "letterboxd.com/film/inception/"
+	"film_link": "letterboxd.com/film/inception/",
+	"avg_rating": 3.75,
+	"like_ratio": 0.25,
+	"num_likes": 1,
+	"num_ratings": 2,
+	"num_watches": 4
 }
 ```
 
