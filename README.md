@@ -153,9 +153,9 @@ python api/index.py
 
 ---
 
-## Scraping
+## Scraping and Stats
 
-This project includes a preconfigured GitHub Actions workflow that automatically triggers the scraper on a schedule (see `.github/workflows/scrape.yml`). This GitHub Action can also be triggered manually through the GitHub GUI. If you're setting this up in your own GitHub repo, ensure your GitHub repository secrets are configured.
+This project includes a preconfigured GitHub Actions workflow that automatically triggers the scraper and computes stats on a schedule (see `.github/workflows/scrape.yml`). This GitHub Action can also be triggered manually through the GitHub GUI. If you're setting this up in your own GitHub repo, ensure your GitHub repository secrets are configured.
 
 The schedule is defined using cron syntax in the workflow file:
 
@@ -163,6 +163,8 @@ The schedule is defined using cron syntax in the workflow file:
 schedule:
     - cron: "0 8 * * *" # runs every day at 8:00 AM UTC (2:00 AM CST / 3:00 AM CDT)
 ```
+
+There is a separate preconfigured GitHub Actions workflow that triggers only a computation of the stats (see `.github/workflows/stats.yml`). This action is triggered manually through the GitHub GUI.
 
 ---
 
@@ -189,5 +191,6 @@ api/
 README.md
 requirements.txt
 scraper.py             # Scraping functionality
+stats.py			   # Stats computation
 vercel.json
 ```
