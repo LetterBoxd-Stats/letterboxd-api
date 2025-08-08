@@ -16,8 +16,10 @@ Returns a simple greeting.
 
 Query Parameters:
 
--   `page`: integer, optional (defualt 1).
--   `limit`: integer, optional (default 20). Number of films per page.
+-   `page`: integer, optional (defualt `1`).
+-   `limit`: integer, optional (default `20`). Number of films per page.
+-   `sort_by`: string, optional (default `film_title`). Name of the field to sort by.
+-   `sort_order`: string, optional (default `asc` for string fields and `desc` for numerical fields). Order to sort the results (`asc` for ascending, `desc` for descending).
 
 Returns a paginated list of scraped film entries:
 

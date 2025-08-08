@@ -32,6 +32,11 @@ def connect_to_db():
     logger.info("Connected to MongoDB")
     return db, config.DB_USERS_COLLECTION, config.DB_FILMS_COLLECTION
 
+def get_film_fields():
+    return [
+        'film_id', 'film_title', 'film_link', 'avg_rating', 'like_ratio', 'num_likes', 'num_ratings', 'num_watches'
+    ]
+
 
 # ============================
 # Routes
@@ -53,6 +58,22 @@ def films():
         page = int(request.args.get('page', 1))  # default page = 1
         limit = int(request.args.get('limit', 20))  # default limit = 20
 
+        # Get query params for sorting
+        sort_field = request.args.get('sort_by', 'film_title')
+
+        allowed_fields = get_film_fields()
+        if sort_field not in allowed_fields:
+            return jsonify({'error': f'Invalid sort field: {sort_field}'}), 400
+        
+        if sort_field in ['film_title', 'film_id', 'film_link']:
+            sort_order = request.args.get('sort_order', 'asc')
+        else:
+            sort_order = request.args.get('sort_order', 'desc')
+        
+        if sort_order not in ['asc', 'desc']:
+            return jsonify({'error': f'Invalid sort order: {sort_order}. Must be "asc" or "desc".'}), 400
+        sort_direction = 1 if sort_order == 'asc' else -1
+
         # Calculate skip for MongoDB
         skip = (page - 1) * limit
 
@@ -61,10 +82,13 @@ def films():
 
         # Fetch paginated data
         films_cursor = films_collection.find({}, {'_id': 0}) \
-            .sort("film_title", 1) \
-            .collation({'locale': 'en', 'strength': 1}) \
-            .skip(skip) \
-            .limit(limit)
+            .sort(sort_field, sort_direction)
+
+        if sort_field == 'film_title':
+            films_cursor = films_cursor.collation({'locale': 'en', 'strength': 1})
+
+        films_cursor = films_cursor.skip(skip).limit(limit)
+
         films = list(films_cursor)
 
         # Calculate total pages
