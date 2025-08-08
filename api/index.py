@@ -60,7 +60,11 @@ def films():
         total_films = films_collection.count_documents({})
 
         # Fetch paginated data
-        films_cursor = films_collection.find({}, {'_id': 0}).skip(skip).limit(limit)
+        films_cursor = films_collection.find({}, {'_id': 0}) \
+            .sort("film_title", 1) \
+            .collation({'locale': 'en', 'strength': 1}) \
+            .skip(skip) \
+            .limit(limit)
         films = list(films_cursor)
 
         # Calculate total pages
