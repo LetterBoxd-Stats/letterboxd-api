@@ -37,6 +37,38 @@ def get_film_fields():
         'film_id', 'film_title', 'film_link', 'avg_rating', 'like_ratio', 'num_likes', 'num_ratings', 'num_watches'
     ]
 
+def get_film_filter_query(args):
+    filter_query = {}
+    # Define which fields are expected and their cast types
+    fields = {
+        'avg_rating': float,
+        'like_ratio': float,
+        'num_likes': int,
+        'num_ratings': int,
+        'num_watches': int
+    }
+
+    for field, cast in fields.items():
+        gte_key = f"{field}_gte"
+        lte_key = f"{field}_lte"
+        range_filter = {}
+
+        if gte_key in args:
+            try:
+                range_filter['$gte'] = cast(args[gte_key])
+            except ValueError:
+                return {'error': f'Invalid value for {gte_key}'}
+
+        if lte_key in args:
+            try:
+                range_filter['$lte'] = cast(args[lte_key])
+            except ValueError:
+                return {'error': f'Invalid value for {lte_key}'}
+
+        if range_filter:
+            filter_query[field] = range_filter
+
+    return filter_query
 
 # ============================
 # Routes
@@ -74,14 +106,19 @@ def films():
             return jsonify({'error': f'Invalid sort order: {sort_order}. Must be "asc" or "desc".'}), 400
         sort_direction = 1 if sort_order == 'asc' else -1
 
+        # Filter films based on query parameters
+        filter_query = get_film_filter_query(request.args)
+        if 'error' in filter_query:
+            return jsonify(filter_query), 400
+
         # Calculate skip for MongoDB
         skip = (page - 1) * limit
 
         # Get total count
-        total_films = films_collection.count_documents({})
+        total_films = films_collection.count_documents(filter_query)
 
         # Fetch paginated data
-        films_cursor = films_collection.find({}, {'_id': 0}) \
+        films_cursor = films_collection.find(filter_query, {'_id': 0}) \
             .sort(sort_field, sort_direction)
 
         if sort_field == 'film_title':

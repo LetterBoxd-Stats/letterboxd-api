@@ -20,8 +20,10 @@ Query Parameters:
 -   `limit`: integer, optional (default `20`). Number of films per page.
 -   `sort_by`: string, optional (default `film_title`). Name of the field to sort by.
 -   `sort_order`: string, optional (default `asc` for string fields and `desc` for numerical fields). Order to sort the results (`asc` for ascending, `desc` for descending).
+-   `{field_name}_gte`: number, optional. Filters results by field greater than or equal to value.
+-   `{field_name}_lte`: number, optional. Filters results by field less than or equal to value.
 
-Returns a paginated list of scraped film entries:
+Returns a paginated list of scraped film entries according to the query parameters:
 
 ```json
 {
