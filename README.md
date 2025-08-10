@@ -36,7 +36,29 @@ Returns a paginated list of scraped film entries according to the query paramete
 			"like_ratio": 0.25,
 			"num_likes": 1,
 			"num_ratings": 2,
-			"num_watches": 4
+			"num_watches": 4,
+			"ratings": [
+				{
+					"user": "samuelmgaines",
+					"rating": 4,
+					"is_liked": false
+				},
+				{
+					"user": "devinbaron",
+					"rating": 3.5,
+					"is_liked": true
+				}
+			],
+			"watches": [
+				{
+					"user": "embrune",
+					"is_liked": false
+				},
+				{
+					"user": "nkilpatrick",
+					"is_liked": false
+				}
+			]
 		},
 		{
 			"film_id": "51621",
@@ -44,9 +66,17 @@ Returns a paginated list of scraped film entries according to the query paramete
 			"film_title": "Good Will Hunting",
 			"avg_rating": 4.5,
 			"like_ratio": 1,
-			"num_likes": 3,
-			"num_ratings": 3,
-			"num_watches": 3
+			"num_likes": 1,
+			"num_ratings": 1,
+			"num_watches": 1,
+			"ratings": [
+				{
+					"user": "samuelmgaines",
+					"rating": 4.5,
+					"is_liked": true
+				}
+			],
+			"watches": []
 		}
 	],
 	"page": 1,
@@ -69,7 +99,29 @@ Returns the film entry for the specified `film_id`:
 	"like_ratio": 0.25,
 	"num_likes": 1,
 	"num_ratings": 2,
-	"num_watches": 4
+	"num_watches": 4,
+	"ratings": [
+		{
+			"user": "samuelmgaines",
+			"rating": 4,
+			"is_liked": false
+		},
+		{
+			"user": "devinbaron",
+			"rating": 3.5,
+			"is_liked": true
+		}
+	],
+	"watches": [
+		{
+			"user": "embrune",
+			"is_liked": false
+		},
+		{
+			"user": "nkilpatrick",
+			"is_liked": false
+		}
+	]
 }
 ```
 

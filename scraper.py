@@ -23,7 +23,9 @@ def extract_film_data(data, div):
             film_link = div['data-target-link'] if div and 'data-target-link' in div.attrs else None
             data['films'][film_id] = {
                 'title': film_title,
-                'link': 'https://letterboxd.com' + film_link
+                'link': 'https://letterboxd.com' + film_link,
+                'ratings': [],
+                'watches': []
             }
         return film_id
 
@@ -37,10 +39,19 @@ def extract_user_review(data, review, film_id, username):
             'rating': rating,
             'is_liked': is_liked
         }
+        data['films'][film_id]['ratings'].append({
+            'user': username,
+            'rating': rating,
+            'is_liked': is_liked
+        })
     else:
         data['users'][username]['watches'][film_id] = {
             'is_liked': is_liked
         }
+        data['films'][film_id]['watches'].append({
+            'user': username,
+            'is_liked': is_liked
+        })
 
 # returns True if there is another page
 def scrape_letterboxd_page(data, username, page_num):
