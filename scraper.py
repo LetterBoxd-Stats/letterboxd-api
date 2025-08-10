@@ -24,7 +24,7 @@ def extract_film_data(data, div):
             data['films'][film_id] = {
                 'title': film_title,
                 'link': 'https://letterboxd.com' + film_link,
-                'ratings': [],
+                'reviews': [],
                 'watches': []
             }
         return film_id
