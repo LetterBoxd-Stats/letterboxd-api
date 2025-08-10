@@ -11,17 +11,17 @@ def compute_stats(db, films_collection_name):
     logging.info("Computing film statistics...")
 
     for film in films:
-        ratings = film.get('ratings', [])
+        reviews = film.get('reviews', [])
         watches = film.get('watches', [])
 
-        num_ratings = len(ratings)
+        num_ratings = len(reviews)
         num_watches = len(watches)
 
         # Sum ratings values
-        total_rating = sum(r['rating'] for r in ratings if 'rating' in r)
-        
+        total_rating = sum(r['rating'] for r in reviews if 'rating' in r)
+
         # Count likes
-        num_likes = sum(1 for r in ratings if r.get('is_liked'))
+        num_likes = sum(1 for r in reviews if r.get('is_liked'))
         num_likes += sum(1 for w in watches if w.get('is_liked'))
 
         # Calculate averages and ratios

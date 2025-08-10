@@ -37,7 +37,7 @@ Returns a paginated list of scraped film entries according to the query paramete
 			"num_likes": 1,
 			"num_ratings": 2,
 			"num_watches": 4,
-			"ratings": [
+			"reviews": [
 				{
 					"user": "samuelmgaines",
 					"rating": 4,
@@ -69,7 +69,7 @@ Returns a paginated list of scraped film entries according to the query paramete
 			"num_likes": 1,
 			"num_ratings": 1,
 			"num_watches": 1,
-			"ratings": [
+			"reviews": [
 				{
 					"user": "samuelmgaines",
 					"rating": 4.5,
@@ -100,7 +100,7 @@ Returns the film entry for the specified `film_id`:
 	"num_likes": 1,
 	"num_ratings": 2,
 	"num_watches": 4,
-	"ratings": [
+	"reviews": [
 		{
 			"user": "samuelmgaines",
 			"rating": 4,

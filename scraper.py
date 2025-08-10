@@ -39,7 +39,7 @@ def extract_user_review(data, review, film_id, username):
             'rating': rating,
             'is_liked': is_liked
         }
-        data['films'][film_id]['ratings'].append({
+        data['films'][film_id]['reviews'].append({
             'user': username,
             'rating': rating,
             'is_liked': is_liked
@@ -105,7 +105,9 @@ def scrape_letterboxd_users_data(db, users_collection_name, films_collection_nam
             {
                 "film_id": film_id,
                 "film_title": film_data['title'],
-                "film_link": film_data['link']
+                "film_link": film_data['link'],
+                "reviews": film_data['reviews'],
+                "watches": film_data['watches']
             },
             upsert=True
         )
