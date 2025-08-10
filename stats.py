@@ -15,7 +15,7 @@ def compute_stats(db, films_collection_name):
         watches = film.get('watches', [])
 
         num_ratings = len(reviews)
-        num_watches = len(watches)
+        num_watches = len(watches) + num_ratings
 
         # Sum ratings values
         total_rating = sum(r['rating'] for r in reviews if 'rating' in r)
