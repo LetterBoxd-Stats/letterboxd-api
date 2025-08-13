@@ -22,6 +22,7 @@ Query Parameters:
 -   `sort_order`: string, optional (default `asc` for string fields and `desc` for numerical fields). Order to sort the results (`asc` for ascending, `desc` for descending).
 -   `{field_name}_gte`: number, optional. Filters results by field greater than or equal to value.
 -   `{field_name}_lte`: number, optional. Filters results by field less than or equal to value.
+-   `watched_by`: string, optional. Comma-separated list of usernames. Filters results to only those containing each user in either `reviews` or `watches`.
 
 Returns a paginated list of scraped film entries according to the query parameters:
 

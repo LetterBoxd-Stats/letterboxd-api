@@ -68,7 +68,22 @@ def get_film_filter_query(args):
         if range_filter:
             filter_query[field] = range_filter
 
+    # Require all listed users to be in watches/reviews
+    if 'watched_by' in args:
+        users = [u.strip() for u in args['watched_by'].split(',') if u.strip()]
+        if users:
+            and_conditions = []
+            for user in users:
+                and_conditions.append({
+                    '$or': [
+                        {'watches': {'$elemMatch': {'user': user}}},
+                        {'reviews': {'$elemMatch': {'user': user}}}
+                    ]
+                })
+            filter_query['$and'] = and_conditions
+
     return filter_query
+
 
 # ============================
 # Routes
