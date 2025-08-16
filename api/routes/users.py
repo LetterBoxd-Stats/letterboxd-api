@@ -1,5 +1,5 @@
 from flask import Blueprint
-from db import get_db
+from api.db import get_db
 import logging
 
 logger = logging.getLogger(__name__)

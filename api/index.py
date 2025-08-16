@@ -1,16 +1,16 @@
 from flask import Flask
 from flask_cors import CORS
 import logging
-import config
-from routes.films import films_bp
-from routes.users import users_bp
+import api.config
+from api.routes.films import films_bp
+from api.routes.users import users_bp
 
-config.configure_logging()
+api.config.configure_logging()
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-allowed_origins = "*" if config.ENV == 'dev' else [config.FRONTEND_URL]
+allowed_origins = "*" if api.config.ENV == 'dev' else [api.config.FRONTEND_URL]
 CORS(app, resources={r"/*": {"origins": allowed_origins}})
 
 # Register Blueprints
@@ -22,4 +22,4 @@ def home():
     return 'Hello, World!'
 
 if __name__ == '__main__':
-    app.run(debug=(config.ENV == 'dev'))
+    app.run(debug=(api.config.ENV == 'dev'))

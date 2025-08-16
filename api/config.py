@@ -5,7 +5,6 @@ import os
 # Load environment variables once (for dev + prod)
 load_dotenv()
 
-# Optional: pull environment-specific config
 ENV = os.getenv('ENV')
 LETTERBOXD_USERNAMES = os.getenv('LETTERBOXD_USERNAMES', '').split(',')
 DB_URI = os.getenv('DB_URI')

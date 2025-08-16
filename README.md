@@ -213,7 +213,7 @@ pip install -r requirements.txt
 4. Run the server:
 
 ```bash
-python api/index.py
+python -m api.index
 ```
 
 ---
@@ -258,9 +258,15 @@ Logs are handled using Python's `logging` module and will appear in:
 .github/
 ├──workflows/
     ├── scrape.yml     # Scrape action configuration
+	├── stats.yml	   # Compute stats action configuration
 api/
 ├── index.py           # Flask app and endpoints
 ├── config.py          # Logging and environment loading
+├── db.py			   # Database configuration
+├── helpers.py	       # Helper functions
+├── routes/
+	├── films.py	   # Logic for films routes
+	├── users.py	   # Logic for users routes
 .env                   # Local environment variables (not in repository)
 .gitignore
 README.md
