@@ -1,0 +1,50 @@
+from flask import Blueprint, request, jsonify
+from db import get_db
+from helpers import get_film_fields, get_film_filter_query
+import logging
+
+logger = logging.getLogger(__name__)
+films_bp = Blueprint('films', __name__, url_prefix='/films')
+
+@films_bp.route('/')
+def get_films():
+    db = get_db()
+    films_collection = db['films']  # or use config
+
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 20))
+    sort_field = request.args.get('sort_by', 'film_title')
+    sort_order = request.args.get('sort_order', 'asc')
+    
+    if sort_field not in get_film_fields():
+        return jsonify({'error': f'Invalid sort field: {sort_field}'}), 400
+    sort_direction = 1 if sort_order == 'asc' else -1
+
+    filter_query = get_film_filter_query(request.args)
+    if 'error' in filter_query:
+        return jsonify(filter_query), 400
+
+    skip = (page - 1) * limit
+    total_films = films_collection.count_documents(filter_query)
+    films_cursor = films_collection.find(filter_query, {'_id': 0}) \
+        .sort(sort_field, sort_direction).skip(skip).limit(limit)
+
+    total_pages = (total_films + limit - 1) // limit
+    if page > total_pages and total_films > 0:
+        return jsonify({'error': 'Page number out of range'}), 400
+
+    return jsonify({
+        'films': list(films_cursor),
+        'page': page,
+        'per_page': limit,
+        'total_pages': total_pages,
+        'total_films': total_films
+    })
+
+@films_bp.route('/<film_id>')
+def get_film(film_id):
+    db = get_db()
+    film = db['films'].find_one({'film_id': film_id}, {'_id': 0})
+    if film:
+        return film
+    return {'error': 'Film not found'}, 404
