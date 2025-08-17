@@ -26,8 +26,16 @@ def get_films():
 
     skip = (page - 1) * limit
     total_films = films_collection.count_documents(filter_query)
-    films_cursor = films_collection.find(filter_query, {'_id': 0}) \
-        .sort(sort_field, sort_direction).skip(skip).limit(limit)
+    if sort_field == "film_title":
+        films_cursor = films_collection.find(filter_query, {"_id": 0}) \
+            .sort(sort_field, sort_direction) \
+            .collation({"locale": "en", "strength": 2}) \
+            .skip(skip).limit(limit)
+    else:
+        films_cursor = films_collection.find(filter_query, {"_id": 0}) \
+            .sort(sort_field, sort_direction) \
+            .skip(skip).limit(limit)
+
 
     total_pages = (total_films + limit - 1) // limit
     if page > total_pages and total_films > 0:
