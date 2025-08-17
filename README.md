@@ -138,16 +138,24 @@ Returns all users and their scraped review data:
 	{
 		"username": "samuelmgaines",
 		"last_update_time": "Tue, 22 Jul 2025 05:09:48 GMT",
-		"reviews": {
-			"34722": {
-				"rating": 4.5,
-				"is_liked": false
-			}
-		},
-		"watches": {
-			"51621": {
-				"is_liked": true
-			}
+		"stats": {
+			"num_watches": 2,
+			"num_ratings": 1,
+			"avg_rating": 4.5,
+			"rating_distr": {
+				"0.5": 0,
+				"1": 0,
+				"1.5": 0,
+				"2": 0,
+				"2.5": 0,
+				"3": 0,
+				"3.5": 0,
+				"4": 0,
+				"4.5": 1,
+				"5": 0
+			},
+			"num_likes": 1,
+			"like_ratio": 0.5
 		}
 	}
 ]
@@ -171,6 +179,25 @@ Returns the user with the specified `username` and their scraped review data:
 		"51621": {
 			"is_liked": true
 		}
+	},
+	"stats": {
+		"num_watches": 2,
+		"num_ratings": 1,
+		"avg_rating": 4.5,
+		"rating_distr": {
+			"0.5": 0,
+			"1": 0,
+			"1.5": 0,
+			"2": 0,
+			"2.5": 0,
+			"3": 0,
+			"3.5": 0,
+			"4": 0,
+			"4.5": 1,
+			"5": 0
+		},
+		"num_likes": 1,
+		"like_ratio": 0.5
 	}
 }
 ```
