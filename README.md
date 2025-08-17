@@ -98,7 +98,7 @@ Returns the film entry for the specified `film_id`:
 {
 	"film_id": "34722",
 	"film_title": "Inception",
-	"film_link": "letterboxd.com/film/inception/",
+	"film_link": "https://letterboxd.com/film/inception/",
 	"avg_rating": 3.75,
 	"like_ratio": 0.25,
 	"num_likes": 1,
@@ -169,17 +169,23 @@ Returns the user with the specified `username` and their scraped review data:
 {
 	"username": "samuelmgaines",
 	"last_update_time": "Tue, 22 Jul 2025 05:09:48 GMT",
-	"reviews": {
-		"34772": {
+	"reviews": [
+		{
+			"film_id": "34772",
+			"film_title": "Inception",
+			"film_link": "https://letterboxd.com/film/inception/",
 			"rating": 4.5,
 			"is_liked": false
 		}
-	},
-	"watches": {
-		"51621": {
+	],
+	"watches": [
+		{
+			"film_id": "51621",
+			"film_title": "Good Will Hunting",
+			"film_link": "https://letterboxd.com/film/good-will-hunting/",
 			"is_liked": true
 		}
-	},
+	],
 	"stats": {
 		"num_watches": 2,
 		"num_ratings": 1,

@@ -35,19 +35,25 @@ def extract_user_review(data, review, film_id, username):
     rating = convert_stars_to_number(stars)
     is_liked = (review.select_one('p.poster-viewingdata span.like') is not None)
     if rating is not None:
-        data['users'][username]['reviews'][film_id] = {
+        data['users'][username]['reviews'].append({
+            'film_id': film_id,
+            'film_title': data['films'][film_id]['title'],
+            'film_link': data['films'][film_id]['link'],
             'rating': rating,
             'is_liked': is_liked
-        }
+        })
         data['films'][film_id]['reviews'].append({
             'user': username,
             'rating': rating,
             'is_liked': is_liked
         })
     else:
-        data['users'][username]['watches'][film_id] = {
+        data['users'][username]['watches'].append({
+            'film_id': film_id,
+            'film_title': data['films'][film_id]['title'],
+            'film_link': data['films'][film_id]['link'],
             'is_liked': is_liked
-        }
+        })
         data['films'][film_id]['watches'].append({
             'user': username,
             'is_liked': is_liked
@@ -72,7 +78,7 @@ def scrape_letterboxd_page(data, username, page_num):
     return (next_page is not None)
 
 def scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames):
-    data = {"users": {username: {"reviews": {}, "watches": {}} for username in usernames}, "films": {}}
+    data = {"users": {username: {"reviews": [], "watches": []} for username in usernames}, "films": {}}
 
     for i, username in enumerate(usernames):
         page_num = 1
@@ -94,7 +100,7 @@ def scrape_letterboxd_users_data(db, users_collection_name, films_collection_nam
             {
                 "username": username,
                 "reviews": user_data['reviews'],
-                "watches": user_data.get('watches', {}),
+                "watches": user_data.get('watches', []),
                 "last_update_time": user_data['last_update_time']
             }, 
             upsert=True

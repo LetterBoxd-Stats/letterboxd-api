@@ -52,28 +52,29 @@ def compute_user_stats(db, users_collection_name):
         reviews = user.get('reviews', [])
         watches = user.get('watches', [])
 
+        # Counts
         num_ratings = len(reviews)
-        num_watches = len(watches) + num_ratings
+        num_watches = len(watches) + num_ratings  # total watches = ratings + watches
 
-        # Sum ratings values
-        total_rating = sum(r['rating'] for r in reviews if 'rating' in r)
+        # Sum ratings
+        total_rating = sum(r.get('rating', 0) for r in reviews if 'rating' in r)
 
-        # Count likes
+        # Likes
         num_likes = sum(1 for r in reviews if r.get('is_liked'))
         num_likes += sum(1 for w in watches if w.get('is_liked'))
 
-        # Calculate averages and ratios
+        # Averages and ratios
         avg_rating = (total_rating / num_ratings) if num_ratings > 0 else None
         like_ratio = (num_likes / num_watches) if num_watches > 0 else None
 
-        # Compute rating distribution
+        # Rating distribution (0.5 → 5.0 in 0.5 steps)
         rating_distr = {}
-        for i in range(0.5, 5.5, 0.5):
+        for i in [x * 0.5 for x in range(1, 11)]:
             rating_distr[str(i)] = sum(1 for r in reviews if r.get('rating') == i)
 
         # Update the user in the DB
         users_collection.update_one(
-            {'user_id': user['user_id']},
+            {'username': user['username']},   # changed from user_id → username
             {'$set': {
                 'stats': {
                     'num_watches': num_watches,
@@ -87,6 +88,7 @@ def compute_user_stats(db, users_collection_name):
         )
 
     logging.info("User statistics updated successfully.")
+
 
 def main():
     # Configure logging
