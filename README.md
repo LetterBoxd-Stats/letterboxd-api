@@ -144,15 +144,15 @@ Returns all users and their scraped review data:
 			"avg_rating": 4.5,
 			"rating_distr": {
 				"0.5": 0,
-				"1": 0,
+				"1.0": 0,
 				"1.5": 0,
-				"2": 0,
+				"2.0": 0,
 				"2.5": 0,
-				"3": 0,
+				"3.0": 0,
 				"3.5": 0,
-				"4": 0,
+				"4.0": 0,
 				"4.5": 1,
-				"5": 0
+				"5.0": 0
 			},
 			"num_likes": 1,
 			"like_ratio": 0.5
