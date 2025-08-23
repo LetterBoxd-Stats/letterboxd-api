@@ -7,140 +7,139 @@ from pymongo import MongoClient
 import requests
 import time
 
-def convert_stars_to_number(stars):
+def convert_stars_to_number(stars: str) -> float | None:
+    """Convert star string (e.g., '★★½') to numeric value."""
     if not stars:
         return None
-    full_stars = stars.count('★')
-    half_stars = stars.count('½')
-    return full_stars + 0.5 * half_stars
+    return stars.count('★') + 0.5 * stars.count('½')
 
-def extract_film_data(data, div):
-        film_id = div['data-film-id'] if div and 'data-film-id' in div.attrs else None
-        if film_id is None:
-            return False
-        if film_id not in data['films']:
-            film_title = div.find('img')['alt'] if div else None
-            film_link = div['data-target-link'] if div and 'data-target-link' in div.attrs else None
-            data['films'][film_id] = {
-                'title': film_title,
-                'link': 'https://letterboxd.com' + film_link,
-                'reviews': [],
-                'watches': []
-            }
-        return film_id
+def extract_film_data(data: dict, div: BeautifulSoup) -> str | None:
+    """Extract film info from poster div and store in data['films']."""
+    if not div or 'data-film-id' not in div.attrs:
+        return None
+    film_id = div['data-film-id']
+    if film_id not in data['films']:
+        film_title = div.find('img')['alt'] if div.find('img') else None
+        film_link = div.get('data-target-link')
+        data['films'][film_id] = {
+            'title': film_title,
+            'link': 'https://letterboxd.com' + film_link if film_link else None,
+            'reviews': [],
+            'watches': []
+        }
+    return film_id
 
-def extract_user_review(data, review, film_id, username):
-    rating_span = review.select_one('p.poster-viewingdata span.rating')
-    stars = rating_span.text.strip() if rating_span else None
-    rating = convert_stars_to_number(stars)
-    is_liked = (review.select_one('p.poster-viewingdata span.like') is not None)
+def record_review_or_watch(data: dict, username: str, film_id: str, rating: float | None, is_liked: bool):
+    """Add review or watch to both user and film entries."""
+    film_data = data['films'][film_id]
+    user_entry = {
+        'film_id': film_id,
+        'film_title': film_data['title'],
+        'film_link': film_data['link'],
+        'is_liked': is_liked
+    }
+
     if rating is not None:
-        data['users'][username]['reviews'].append({
-            'film_id': film_id,
-            'film_title': data['films'][film_id]['title'],
-            'film_link': data['films'][film_id]['link'],
-            'rating': rating,
-            'is_liked': is_liked
-        })
+        user_entry['rating'] = rating
+        data['users'][username]['reviews'].append(user_entry)
         data['films'][film_id]['reviews'].append({
             'user': username,
             'rating': rating,
             'is_liked': is_liked
         })
     else:
-        data['users'][username]['watches'].append({
-            'film_id': film_id,
-            'film_title': data['films'][film_id]['title'],
-            'film_link': data['films'][film_id]['link'],
-            'is_liked': is_liked
-        })
+        data['users'][username]['watches'].append(user_entry)
         data['films'][film_id]['watches'].append({
             'user': username,
             'is_liked': is_liked
         })
 
-# returns True if there is another page
-def scrape_letterboxd_page(data, username, page_num):
-    url = f"https://letterboxd.com/{username}/films/by/rated-date/page/{page_num}/"
+def scrape_letterboxd_page(data: dict, username: str, page_num: int) -> bool:
+    """Scrape a single Letterboxd page for the given user."""
+    url = f"https://letterboxd.com/{username}/films/by/date/page/{page_num}/"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
-    reviews = soup.select('.poster-container')
-    for review in reviews:
-        div = review.select_one('div.linked-film-poster')
 
-        # Extract film data
+    film_items = soup.select('ul.poster-list li') or soup.select('ul.grid li')
+    for item in film_items:
+        div = item.select_one('div.react-component') or item.select_one('div.linked-film-poster')
         film_id = extract_film_data(data, div)
-        if film_id is not False:
-            extract_user_review(data, review, film_id, username)
-    
-    # Check if there is a next page
-    next_page = soup.select_one('div.pagination a.next')
-    return (next_page is not None)
+        if not film_id:
+            continue
 
-def scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames):
+        # Rating: use data-rating if available, fallback to star parsing
+        rating = None
+        if div:
+            rating_str = div.get('data-rating')
+            rating = float(rating_str) if rating_str else None
+        if rating is None:
+            rating_span = item.select_one('span.rating')
+            rating = convert_stars_to_number(rating_span.text.strip()) if rating_span else None
+
+        # Like status
+        is_liked = item.select_one('span.like') is not None
+
+        record_review_or_watch(data, username, film_id, rating, is_liked)
+
+    # Check for next page
+    return bool(soup.select_one('div.pagination a.next'))
+
+def upsert_collection(collection, match: dict, data: dict):
+    """Helper function to upsert MongoDB document."""
+    collection.replace_one(match, data, upsert=True)
+
+def scrape_letterboxd_users_data(db, users_collection_name: str, films_collection_name: str, usernames: list[str]):
     data = {"users": {username: {"reviews": [], "watches": []} for username in usernames}, "films": {}}
 
-    for i, username in enumerate(usernames):
-        page_num = 1
+    for username in usernames:
         data['users'][username]['last_update_time'] = datetime.now(timezone.utc)
-        while page_num > 0:
+        page_num = 1
+        while True:
             logging.info(f"Scraping {username} page {page_num}...")
-            time.sleep(15)  # Sleep to avoid hitting the server too hard
+            time.sleep(15)  # avoid rate limits
             has_next_page = scrape_letterboxd_page(data, username, page_num)
-            if has_next_page: page_num += 1
-            else: break
-    
+            if has_next_page:
+                page_num += 1
+            else:
+                break
+
     # Upload to MongoDB
     logging.info("Uploading scraped data to MongoDB...")
     users_collection = db[users_collection_name]
     films_collection = db[films_collection_name]
+
     for username, user_data in data['users'].items():
-        users_collection.replace_one(
-            {"username": username},  # Match condition
-            {
-                "username": username,
-                "reviews": user_data['reviews'],
-                "watches": user_data.get('watches', []),
-                "last_update_time": user_data['last_update_time']
-            }, 
-            upsert=True
-        )
+        upsert_collection(users_collection, {"username": username}, {
+            "username": username,
+            "reviews": user_data['reviews'],
+            "watches": user_data.get('watches', []),
+            "last_update_time": user_data['last_update_time']
+        })
     for film_id, film_data in data['films'].items():
-        films_collection.replace_one(
-            {"film_id": film_id},  # Match condition
-            {
-                "film_id": film_id,
-                "film_title": film_data['title'],
-                "film_link": film_data['link'],
-                "reviews": film_data['reviews'],
-                "watches": film_data['watches']
-            },
-            upsert=True
-        )
-    
+        upsert_collection(films_collection, {"film_id": film_id}, {
+            "film_id": film_id,
+            "film_title": film_data['title'],
+            "film_link": film_data['link'],
+            "reviews": film_data['reviews'],
+            "watches": film_data['watches']
+        })
+
     logging.info("Data scraped and saved to database")
 
 def main():
-    # Configure logging
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-    # Load environment variables
     load_dotenv()
 
-    # MongoDB configuration
-    logging.info("Connecting to MongoDB...")
+    # MongoDB config
     mongo_uri = os.getenv('DB_URI')
     db_name = os.getenv('DB_NAME')
-    users_collection_name = os.getenv('DB_USERS_COLLECTION')
-    films_collection_name = os.getenv('DB_FILMS_COLLECTION')
     client = MongoClient(mongo_uri)
     db = client[db_name]
-    logging.info("Connected to MongoDB")
 
-    # Get usernames from environment variable
+    users_collection_name = os.getenv('DB_USERS_COLLECTION')
+    films_collection_name = os.getenv('DB_FILMS_COLLECTION')
     usernames = os.getenv('LETTERBOXD_USERNAMES', '').split(',')
 
-    # Scrape data
     scrape_letterboxd_users_data(db, users_collection_name, films_collection_name, usernames)
 
 if __name__ == "__main__":
