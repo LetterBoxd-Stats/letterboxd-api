@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, request
 from api.db import get_db
 import logging
 
@@ -13,8 +13,13 @@ def get_users():
 
 @users_bp.route('/<username>')
 def get_user(username):
+    include_films = request.args.get('include_films', 'false').lower() == 'true'
+
     db = get_db()
-    user = db['users'].find_one({'username': username}, {'_id': 0})
+    if include_films:
+        user = db['users'].find_one({'username': username}, {'_id': 0})
+    else:
+        user = db['users'].find_one({'username': username}, {'_id': 0, 'reviews': 0, 'watches': 0})
     if user:
         return user
     return {'error': 'User not found'}, 404

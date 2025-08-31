@@ -142,6 +142,9 @@ Returns all users and their scraped review data:
 			"num_watches": 2,
 			"num_ratings": 1,
 			"avg_rating": 4.5,
+			"median_rating": 4.5,
+			"mode_rating": 4.5,
+			"stdev_rating": 0,
 			"rating_distr": {
 				"0.5": 0,
 				"1.0": 0,
@@ -155,7 +158,16 @@ Returns all users and their scraped review data:
 				"5.0": 0
 			},
 			"num_likes": 1,
-			"like_ratio": 0.5
+			"like_ratio": 0.5,
+			"mean_abs_diff": 0.5,
+			"mean_diff": 0.5,
+			"pairwise_agreement": {
+				"devinbaron": {
+					"mean_abs_diff": 0.5,
+					"mean_diff": 0.5,
+					"num_shared": 1
+				}
+			}
 		}
 	}
 ]
@@ -190,6 +202,9 @@ Returns the user with the specified `username` and their scraped review data:
 		"num_watches": 2,
 		"num_ratings": 1,
 		"avg_rating": 4.5,
+		"median_rating": 4.5,
+		"mode_rating": 4.5,
+		"stdev_rating": 0,
 		"rating_distr": {
 			"0.5": 0,
 			"1": 0,
@@ -203,7 +218,16 @@ Returns the user with the specified `username` and their scraped review data:
 			"5": 0
 		},
 		"num_likes": 1,
-		"like_ratio": 0.5
+		"like_ratio": 0.5,
+		"mean_abs_diff": 0.5,
+		"mean_diff": 0.5,
+		"pairwise_agreement": {
+			"devinbaron": {
+				"mean_abs_diff": 0.5,
+				"mean_diff": 0.5,
+				"num_shared": 1
+			}
+		}
 	}
 }
 ```
