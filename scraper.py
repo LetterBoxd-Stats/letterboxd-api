@@ -499,7 +499,7 @@ def main():
     
     # Initialize and run scraper
     scraper = LetterboxdScraper(mongo_uri, db_name)
-    # scraper.scrape_users_data(users_collection_name, films_collection_name, usernames)
+    scraper.scrape_users_data(users_collection_name, films_collection_name, usernames)
     scraper.scrape_films_data(films_collection_name)
 
 
