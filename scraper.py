@@ -243,42 +243,43 @@ class LetterboxdScraper:
     
     def get_films_to_update(self, films_collection, scrape_all_films=False):
         """
-        Get films that need metadata updates based on smart criteria.
+        Get films that need metadata updates with staggered scheduling.
         
-        Newer films are updated more frequently to capture rating changes,
-        while older films are updated less frequently.
-        
-        Args:
-            films_collection: MongoDB collection of films
-            scrape_all_films: If True, scrape all films regardless of update time
-            
-        Returns:
-            MongoDB cursor for films that need updating
+        Uses a hash of film_id to distribute updates evenly across time periods
+        to avoid the "thundering herd" problem.
         """
         if scrape_all_films:
             return films_collection.find({})
         
         now = datetime.now(timezone.utc)
         
-        # Define update frequency rules based on film age
-        # Newer films get updated more frequently
-        update_rules = [
-            # Films from current year: update weekly
-            {"year": now.year, "update_frequency_days": 7},
-            # Films from previous year: update every 2 weeks
-            {"year": now.year - 1, "update_frequency_days": 14},
-            # Films from 2-5 years ago: update monthly
-            {"year_range": (now.year - 5, now.year - 2), "update_frequency_days": 30},
-            # Older films: update quarterly
-            {"max_year": now.year - 6, "update_frequency_days": 90}
-        ]
-        
         # Build the query for films that need updating
         update_queries = []
         
+        # 1. Films with NO metadata at all - update immediately (no staggering)
+        no_metadata_query = {
+            "$or": [
+                {"metadata": {"$exists": False}},
+                {"metadata": None}
+            ]
+        }
+        update_queries.append(no_metadata_query)
+        
+        # 2. Films WITH metadata - apply staggered updating based on year
+        update_rules = [
+            # Films from current year: update weekly (spread across the week)
+            {"year": now.year, "update_frequency_days": 7},
+            # Films from previous year: update every 2 weeks (spread across 2 weeks)
+            {"year": now.year - 1, "update_frequency_days": 14},
+            # Films from 2-5 years ago: update monthly (spread across the month)
+            {"year_range": (now.year - 5, now.year - 2), "update_frequency_days": 30},
+            # Older films: update quarterly (spread across the quarter)
+            {"max_year": now.year - 6, "update_frequency_days": 90}
+        ]
+        
         for rule in update_rules:
-            # Calculate the cutoff date for this rule
-            cutoff_date = now - timedelta(days=rule["update_frequency_days"])
+            # Calculate the base cutoff date for this rule
+            base_cutoff_date = now - timedelta(days=rule["update_frequency_days"])
             
             # Build the year filter based on rule type
             year_filter = {}
@@ -295,29 +296,46 @@ class LetterboxdScraper:
             elif "max_year" in rule:
                 year_filter = {"metadata.year": {"$lte": rule["max_year"]}}
             
-            # Add query for films matching this rule that need updating
-            update_queries.append({
+            # Create a query that staggers updates based on film_id hash
+            # This distributes films evenly across the update period
+            staggered_query = {
                 # Films with metadata that match the year criteria
                 **year_filter,
-                # AND either have no last_metadata_update_time or it's older than the cutoff
-                "$or": [
-                    {"last_metadata_update_time": {"$exists": False}},
-                    {"last_metadata_update_time": {"$lte": cutoff_date}},
-                    {"last_metadata_update_time": None}
-                ]
-            })
-        
-        # Also include films that have no metadata at all
-        no_metadata_query = {
-            "$or": [
-                {"metadata": {"$exists": False}},
-                {"metadata": None}
-            ]
-        }
+                # AND have a last_metadata_update_time that's older than their staggered cutoff
+                "$expr": {
+                    "$or": [
+                        {"$eq": ["$last_metadata_update_time", None]},
+                        {
+                            "$lte": [
+                                "$last_metadata_update_time",
+                                {
+                                    "$add": [
+                                        base_cutoff_date,
+                                        {
+                                            "$multiply": [
+                                                rule["update_frequency_days"] * 24 * 60 * 60 * 1000,  # Convert days to milliseconds
+                                                {
+                                                    "$mod": [
+                                                        {"$toInt": {"$substr": [{"$toString": "$film_id"}, -6, 6]}},  # Use last 6 digits of film_id
+                                                        1000000  # Mod by 1,000,000 to get a value between 0-999999
+                                                    ]
+                                                },
+                                                1000000.0  # Divide by 1,000,000 to get a fraction between 0-1
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+            
+            update_queries.append(staggered_query)
         
         # Combine all queries with OR
         final_query = {
-            "$or": update_queries + [no_metadata_query]
+            "$or": update_queries
         }
         
         return films_collection.find(final_query)
