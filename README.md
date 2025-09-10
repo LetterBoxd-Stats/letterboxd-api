@@ -94,6 +94,10 @@ Returns a paginated list of scraped film entries according to the query paramete
 
 Returns the film entry for the specified `film_id`:
 
+Query parameters:
+
+-   `include_films`: boolean, optional (default `false`). Determines whether to include `reviews` and `watches` arrays, which can be large.
+
 ```json
 {
 	"film_id": "34722",
