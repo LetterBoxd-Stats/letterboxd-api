@@ -79,11 +79,21 @@ class LetterboxdScraper:
         self.domain_delays[domain] = current_time
     
     def _make_request(self, url: str, max_retries: int = 3) -> Optional[requests.Response]:
-        """Make HTTP request with smart delay and retry logic."""
+        """Make HTTP request with smart delay, retry logic, and header validation."""
         for attempt in range(max_retries):
             try:
                 self._smart_delay(url)
                 response = self.session.get(url, timeout=30)
+                
+                # Validate response headers before proceeding
+                if not self._validate_response_headers(response):
+                    logger.warning(f"Response header validation failed for {url}, attempt {attempt + 1}")
+                    if attempt < max_retries - 1:
+                        time.sleep((2 ** attempt) + random.uniform(0.1, 1.0))
+                        continue
+                    else:
+                        return None
+                
                 response.raise_for_status()
                 
                 # Check if we're being rate limited
@@ -146,6 +156,235 @@ class LetterboxdScraper:
             
         return film_id
     
+    def validate_letterboxd_structure(self) -> bool:
+        """
+        Validate that Letterboxd pages have the expected structure before scraping.
+        
+        Returns:
+            True if all validations pass, False otherwise
+        """
+        logger.info("Validating Letterboxd page structure...")
+        
+        test_cases = [
+            self._validate_user_page_structure,
+            self._validate_film_page_structure,
+            self._validate_film_list_structure,
+            self._validate_pagination_structure
+        ]
+        
+        all_passed = True
+        
+        for test_case in test_cases:
+            try:
+                if not test_case():
+                    all_passed = False
+                    logger.error(f"Validation failed: {test_case.__name__}")
+            except Exception as e:
+                logger.error(f"Validation error in {test_case.__name__}: {e}")
+                all_passed = False
+        
+        if all_passed:
+            logger.info("All Letterboxd structure validations passed!")
+        else:
+            logger.error("Letterboxd structure validations failed! Aborting scrape.")
+        
+        return all_passed
+
+    def _validate_user_page_structure(self) -> bool:
+        """Validate that user pages have the expected structure."""
+        # Test with a known public user profile
+        test_user = "devinbaron"  # Using one of your usernames
+        url = f"https://letterboxd.com/{test_user}/films/by/date/"
+        
+        response = self._make_request(url)
+        if not response:
+            logger.error(f"Failed to fetch test user page: {url}")
+            return False
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Check critical selectors
+        critical_selectors = [
+            'ul.poster-list li',  # Film items in grid view
+            'ul.grid li',         # Film items in list view (fallback)
+            'div.pagination',     # Pagination container
+            'div.react-component', # Film poster components
+            'span.rating',        # Rating stars
+            'span.like'           # Like indicator
+        ]
+        
+        for selector in critical_selectors:
+            elements = soup.select(selector)
+            if not elements:
+                logger.warning(f"Selector not found on user page: {selector}")
+                # Don't fail immediately for all selectors, some might be optional
+        
+        # Check for essential elements
+        essential_elements = [
+            ('film items', bool(soup.select('ul.poster-list li') or soup.select('ul.grid li'))),
+            ('pagination', bool(soup.select_one('div.pagination'))),
+            ('film posters', bool(soup.select('div[data-film-id]'))),
+        ]
+        
+        for element_name, exists in essential_elements:
+            if not exists:
+                logger.error(f"Essential element missing from user page: {element_name}")
+                return False
+        
+        logger.info("User page structure validation passed")
+        return True
+
+    def _validate_film_page_structure(self) -> bool:
+        """Validate that film pages have the expected structure."""
+        # Test with a known film
+        test_films = [
+            "https://letterboxd.com/film/the-shawshank-redemption/",
+            "https://letterboxd.com/film/pulp-fiction/",
+            "https://letterboxd.com/film/the-dark-knight/"
+        ]
+        
+        for film_url in test_films:
+            response = self._make_request(film_url)
+            if not response:
+                logger.error(f"Failed to fetch test film page: {film_url}")
+                continue  # Try next film
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Check critical metadata selectors
+            critical_selectors = [
+                'a[href*="/films/year/"]',           # Year
+                'div#tab-genres a[href*="/films/genre/"]',  # Genres
+                'div.truncate p',                    # Description
+                'a[href*="/director/"]',             # Directors
+                'a[href*="/actor/"]',                # Actors
+                'div#tab-crew',                      # Crew section
+                'a[href*="/studio/"]',               # Studios
+                'meta[name="twitter:data2"]',        # Average rating
+                'div.backdrop-wrapper'               # Backdrop
+            ]
+            
+            found_selectors = 0
+            for selector in critical_selectors:
+                elements = soup.select(selector)
+                if elements:
+                    found_selectors += 1
+                else:
+                    logger.warning(f"Selector not found on film page {film_url}: {selector}")
+            
+            # Require at least 70% of critical selectors to be present
+            if found_selectors / len(critical_selectors) < 0.7:
+                logger.error(f"Film page structure significantly changed: {film_url}")
+                return False
+            
+            # Check for essential metadata
+            essential_metadata = [
+                ('year', soup.select_one('a[href*="/films/year/"]')),
+                ('title', soup.select_one('h1.film-title')),
+            ]
+            
+            for metadata_name, element in essential_metadata:
+                if not element:
+                    logger.error(f"Essential metadata missing from film page: {metadata_name}")
+                    return False
+        
+        logger.info("Film page structure validation passed")
+        return True
+
+    def _validate_film_list_structure(self) -> bool:
+        """Validate that film list items have the expected data attributes."""
+        test_user = "devinbaron"
+        url = f"https://letterboxd.com/{test_user}/films/by/date/page/1/"
+        
+        response = self._make_request(url)
+        if not response:
+            logger.error("Failed to fetch film list for validation")
+            return False
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        film_items = soup.select('ul.poster-list li') or soup.select('ul.grid li')
+        
+        if not film_items:
+            logger.error("No film items found in list")
+            return False
+        
+        # Check a sample of film items for required data attributes
+        sample_size = min(5, len(film_items))
+        valid_items = 0
+        
+        for i in range(sample_size):
+            item = film_items[i]
+            div = item.select_one('div.react-component') or item.select_one('div.linked-film-poster')
+            
+            if div and 'data-film-id' in div.attrs:
+                valid_items += 1
+                
+                # Check for optional but important attributes
+                if 'data-target-link' not in div.attrs:
+                    logger.warning("data-target-link attribute missing from film item")
+                if 'data-rating' not in div.attrs:
+                    logger.warning("data-rating attribute missing from film item")
+        
+        # Require at least 60% of sample items to be valid
+        if valid_items / sample_size < 0.6:
+            logger.error("Film item structure significantly changed")
+            return False
+        
+        logger.info("Film list structure validation passed")
+        return True
+
+    def _validate_pagination_structure(self) -> bool:
+        """Validate that pagination works as expected."""
+        test_user = "devinbaron"
+        url = f"https://letterboxd.com/{test_user}/films/by/date/page/1/"
+        
+        response = self._make_request(url)
+        if not response:
+            logger.error("Failed to fetch page for pagination validation")
+            return False
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        pagination = soup.select_one('div.pagination')
+        
+        if not pagination:
+            logger.warning("No pagination found - user might have only one page")
+            return True  # This isn't necessarily a failure
+        
+        # Check pagination elements
+        pagination_elements = pagination.select('a')
+        if not pagination_elements:
+            logger.warning("Pagination found but no links")
+            return True  # Not necessarily a failure
+        
+        # Check if next page link exists
+        next_page = pagination.select_one('a.next')
+        if not next_page:
+            logger.info("Single page of results - pagination validation passed")
+            return True
+        
+        logger.info("Pagination structure validation passed")
+        return True
+
+    def _validate_response_headers(self, response: requests.Response) -> bool:
+        """Validate that response headers indicate a successful request."""
+        if response.status_code != 200:
+            logger.error(f"Unexpected status code: {response.status_code}")
+            return False
+        
+        # Check for rate limiting headers
+        if 'X-RateLimit-Remaining' in response.headers:
+            remaining = int(response.headers['X-RateLimit-Remaining'])
+            if remaining < 10:
+                logger.warning(f"Low rate limit remaining: {remaining}")
+        
+        # Check content type
+        content_type = response.headers.get('Content-Type', '')
+        if 'text/html' not in content_type:
+            logger.error(f"Unexpected content type: {content_type}")
+            return False
+        
+        return True
+    
     def record_review_or_watch(
         self, 
         data: Dict, 
@@ -154,36 +393,36 @@ class LetterboxdScraper:
         rating: Optional[float], 
         is_liked: bool
     ):
-        """Add review or watch to both user and film entries.
-        
-        Args:
-            data: Dictionary containing film and user data
-            username: Letterboxd username
-            film_id: ID of the film
-            rating: Numeric rating or None for watches
-            is_liked: Whether the user liked the film
-        """
+        """Add review or watch to both user and film entries."""
         film_data = data['films'][film_id]
+        current_time = datetime.now(timezone.utc)
+        
         user_entry = {
             'film_id': film_id,
             'film_title': film_data['title'],
             'film_link': film_data['link'],
-            'is_liked': is_liked
+            'is_liked': is_liked,
+            'last_updated': current_time
         }
 
         if rating is not None:
+            # This is a review
             user_entry['rating'] = rating
             data['users'][username]['reviews'].append(user_entry)
+            
             data['films'][film_id]['reviews'].append({
                 'user': username,
                 'rating': rating,
-                'is_liked': is_liked
+                'is_liked': is_liked,
+                'last_updated': current_time
             })
         else:
+            # This is a watch
             data['users'][username]['watches'].append(user_entry)
             data['films'][film_id]['watches'].append({
                 'user': username,
-                'is_liked': is_liked
+                'is_liked': is_liked,
+                'last_updated': current_time
             })
     
     def scrape_user_page(self, data: Dict, username: str, page_num: int) -> Tuple[bool, int]:
@@ -234,7 +473,7 @@ class LetterboxdScraper:
         return bool(soup.select_one('div.pagination a.next')), films_processed
     
     def scrape_user_data(self, username: str, users_collection: Collection, films_collection: Collection) -> bool:
-        """Scrape data for a single user."""
+        """Scrape data for a single user by completely replacing arrays."""
         logger.info(f"Scraping data for user: {username}")
         
         data = {
@@ -242,7 +481,8 @@ class LetterboxdScraper:
             "films": {}
         }
         
-        data['users'][username]['last_update_time'] = datetime.now(timezone.utc)
+        current_time = datetime.now(timezone.utc)
+        data['users'][username]['last_update_time'] = current_time
         page_num = 1
         total_films = 0
         
@@ -257,31 +497,49 @@ class LetterboxdScraper:
                 
             page_num += 1
         
-        # Upload to MongoDB
-        if username in data['users']:  # CORRECTED: Check 'users' instead of 'user'
-            user_data = data['users'][username]
-            self.upsert_collection(users_collection, {"username": username}, {
-                "username": username,
-                "reviews": user_data['reviews'],
-                "watches": user_data.get('watches', []),
-                "last_update_time": user_data['last_update_time']
-            })
-            
+        # Update user document - completely replace arrays
+        users_collection.update_one(
+            {"username": username},
+            {
+                "$set": {
+                    "username": username,
+                    "reviews": data['users'][username]['reviews'],
+                    "watches": data['users'][username]['watches'],
+                    "last_update_time": current_time
+                }
+            },
+            upsert=True
+        )
+        
+        # For films, we need to be more careful since multiple users contribute
         for film_id, film_data in data['films'].items():
+            # First remove any existing entries from this user
             films_collection.update_one(
                 {"film_id": film_id},
                 {
-                    "$set": {
-                        "film_title": film_data['title'],
-                        "film_link": film_data['link']
-                    },
-                    "$push": {
-                        "reviews": {"$each": film_data['reviews']},
-                        "watches": {"$each": film_data['watches']}
+                    "$pull": {
+                        "reviews": {"user": username},
+                        "watches": {"user": username}
                     }
-                },
-                upsert=True
+                }
             )
+            
+            # Then add the new entries
+            if film_data['reviews']:
+                films_collection.update_one(
+                    {"film_id": film_id},
+                    {
+                        "$push": {"reviews": {"$each": film_data['reviews']}}
+                    }
+                )
+            
+            if film_data['watches']:
+                films_collection.update_one(
+                    {"film_id": film_id},
+                    {
+                        "$push": {"watches": {"$each": film_data['watches']}}
+                    }
+                )
         
         logger.info(f"Completed scraping {username} with {total_films} films processed")
         return True
@@ -302,13 +560,7 @@ class LetterboxdScraper:
         films_collection_name: str, 
         usernames: List[str]
     ):
-        """Scrape data for multiple Letterboxd users in parallel.
-        
-        Args:
-            users_collection_name: Name of the MongoDB users collection
-            films_collection_name: Name of the MongoDB films collection
-            usernames: List of Letterboxd usernames to scrape
-        """
+        """Scrape data for multiple Letterboxd users in parallel."""
         users_collection = self.db[users_collection_name]
         films_collection = self.db[films_collection_name]
         
@@ -336,101 +588,98 @@ class LetterboxdScraper:
     def get_films_to_update(self, films_collection, scrape_all_films=False):
         """
         Get films that need metadata updates with staggered scheduling.
-        
-        Uses a hash of film_id to distribute updates evenly across time periods
-        to avoid the "thundering herd" problem.
+        Python-based approach to avoid complex MongoDB aggregation.
         """
         if scrape_all_films:
             return films_collection.find({})
         
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)  # This is timezone-aware
         
-        # Build the query for films that need updating
-        update_queries = []
+        # Get all candidate films first (in batches to avoid memory issues)
+        films_to_update_ids = []
+        batch_size = 1000
         
-        # 1. Films with NO metadata at all - update immediately (no staggering)
-        no_metadata_query = {
-            "$or": [
-                {"metadata": {"$exists": False}},
-                {"metadata": None}
-            ]
-        }
-        update_queries.append(no_metadata_query)
+        # Use batches to avoid loading all films into memory at once
+        for batch_start in range(0, 1000000, batch_size):  # Arbitrary large number
+            batch = list(films_collection.find({}).skip(batch_start).limit(batch_size))
+            if not batch:
+                break
+                
+            for film in batch:
+                film_id = film.get('film_id')
+                last_update = film.get('last_metadata_update_time')
+                metadata = film.get('metadata', {})
+                film_year = metadata.get('year') if metadata else None
+                
+                # Check if film has no metadata
+                if metadata is None or not metadata:
+                    films_to_update_ids.append(film_id)
+                    continue
+                    
+                # Determine update frequency based on film year
+                update_frequency_days = self._get_update_frequency(film_year, now.year)
+                
+                # Calculate staggered cutoff date based on film_id hash
+                cutoff_date = self._get_staggered_cutoff_date(now, update_frequency_days, film_id)
+                
+                # Check if film needs updating - handle timezone comparison
+                if last_update is None:
+                    films_to_update_ids.append(film_id)
+                else:
+                    # Ensure both datetimes are timezone-aware for comparison
+                    if last_update.tzinfo is None:
+                        # If last_update is naive, assume it's UTC and make it aware
+                        last_update_aware = last_update.replace(tzinfo=timezone.utc)
+                    else:
+                        last_update_aware = last_update
+                    
+                    if last_update_aware <= cutoff_date:
+                        films_to_update_ids.append(film_id)
         
-        # 2. Films WITH metadata - apply staggered updating based on year
-        update_rules = [
-            # Films from current year: update weekly (spread across the week)
-            {"year": now.year, "update_frequency_days": 7},
-            # Films from previous year: update every 2 weeks (spread across 2 weeks)
-            {"year": now.year - 1, "update_frequency_days": 14},
-            # Films from 2-5 years ago: update monthly (spread across the month)
-            {"year_range": (now.year - 5, now.year - 2), "update_frequency_days": 30},
-            # Older films: update quarterly (spread across the quarter)
-            {"max_year": now.year - 6, "update_frequency_days": 90}
-        ]
+        # Return cursor for films that need updating
+        if films_to_update_ids:
+            return films_collection.find({"film_id": {"$in": films_to_update_ids}})
+        else:
+            return films_collection.find({"film_id": {"$in": []}})  # Empty cursor
+
+    def _get_staggered_cutoff_date(self, now, frequency_days, film_id):
+        """Calculate staggered cutoff date based on film_id."""
+        # Create a consistent hash from film_id (handle various ID formats)
+        film_str = str(film_id)
         
-        for rule in update_rules:
-            # Calculate the base cutoff date for this rule
-            base_cutoff_date = now - timedelta(days=rule["update_frequency_days"])
-            
-            # Build the year filter based on rule type
-            year_filter = {}
-            if "year" in rule:
-                year_filter = {"metadata.year": rule["year"]}
-            elif "year_range" in rule:
-                min_year, max_year = rule["year_range"]
-                year_filter = {
-                    "metadata.year": {
-                        "$gte": min_year,
-                        "$lte": max_year
-                    }
-                }
-            elif "max_year" in rule:
-                year_filter = {"metadata.year": {"$lte": rule["max_year"]}}
-            
-            # Create a query that staggers updates based on film_id hash
-            # This distributes films evenly across the update period
-            staggered_query = {
-                # Films with metadata that match the year criteria
-                **year_filter,
-                # AND have a last_metadata_update_time that's older than their staggered cutoff
-                "$expr": {
-                    "$or": [
-                        {"$eq": ["$last_metadata_update_time", None]},
-                        {
-                            "$lte": [
-                                "$last_metadata_update_time",
-                                {
-                                    "$add": [
-                                        base_cutoff_date,
-                                        {
-                                            "$multiply": [
-                                                rule["update_frequency_days"] * 24 * 60 * 60 * 1000,  # Convert days to milliseconds
-                                                {
-                                                    "$mod": [
-                                                        {"$toInt": {"$substr": [{"$toString": "$film_id"}, -6, 6]}},  # Use last 6 digits of film_id
-                                                        1000000  # Mod by 1,000,000 to get a value between 0-999999
-                                                    ]
-                                                },
-                                                1000000.0  # Divide by 1,000,000 to get a fraction between 0-1
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            }
-            
-            update_queries.append(staggered_query)
+        # Use a simple hash function that works for all ID types
+        if film_str.isdigit() and len(film_str) >= 4:
+            # For numeric IDs, use the last few digits
+            film_hash = int(film_str[-4:]) % 10000
+        else:
+            # For string IDs, use Python's built-in hash
+            film_hash = abs(hash(film_str)) % 10000
         
-        # Combine all queries with OR
-        final_query = {
-            "$or": update_queries
-        }
+        # Convert to a fraction between 0-1
+        fraction = film_hash / 10000.0
         
-        return films_collection.find(final_query)
+        # Calculate staggered cutoff (spread across the frequency period)
+        staggered_days = frequency_days * fraction
+        cutoff_date = now - timedelta(days=staggered_days)
+        
+        # Ensure cutoff_date is timezone-aware (same as 'now')
+        return cutoff_date
+
+    def _get_update_frequency(self, film_year, current_year):
+        """Determine update frequency based on film age."""
+        if film_year is None:
+            return 7  # Default for films without year data
+        
+        age = current_year - film_year
+        
+        if age <= 0:  # Current year
+            return 7
+        elif age == 1:  # Previous year
+            return 14
+        elif 2 <= age <= 5:  # 2-5 years old
+            return 30
+        else:  # 6+ years old
+            return 90
     
     def scrape_film_metadata(self, film: Dict, films_collection: Collection) -> bool:
         """Scrape metadata for a single film."""
@@ -553,12 +802,7 @@ class LetterboxdScraper:
         return metadata
     
     def scrape_films_data(self, films_collection_name: str, scrape_all_films: bool = False):
-        """Scrape metadata for films in parallel.
-        
-        Args:
-            films_collection_name: Name of the MongoDB films collection
-            scrape_all_films: Whether to scrape all films or only those missing metadata
-        """
+        """Scrape metadata for films in the database in parallel."""        
         films_collection = self.db[films_collection_name]
         films_to_update = list(self.get_films_to_update(films_collection, scrape_all_films))
         
@@ -615,12 +859,17 @@ def main():
     
     # Initialize and run scraper
     scraper = LetterboxdScraper(mongo_uri, db_name)
+
+    # Run validation first
+    # if not scraper.validate_letterboxd_structure():
+    #     logger.error("Letterboxd structure validation failed. Aborting.")
+    #     return
     
     # Scrape user data in parallel
-    scraper.scrape_users_data(users_collection_name, films_collection_name, usernames)
+    # scraper.scrape_users_data(users_collection_name, films_collection_name, usernames)
     
     # Scrape film metadata in parallel
-    # scraper.scrape_films_data(films_collection_name)
+    scraper.scrape_films_data(films_collection_name)
 
 
 if __name__ == "__main__":
