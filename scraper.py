@@ -9,8 +9,11 @@ import logging
 import os
 import re
 import time
+import random
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -39,7 +42,69 @@ class LetterboxdScraper:
         """
         self.client = MongoClient(db_uri)
         self.db = self.client[db_name]
-        self.request_delay = 15  # seconds between requests to avoid rate limiting
+        self.request_delay = 2  # Reduced base delay for parallel processing
+        self.max_workers = 3  # Number of concurrent threads
+        self.domain_delays = {}  # Track delays per domain to avoid rate limiting
+        self.session = self._create_session()
+    
+    def _create_session(self):
+        """Create a requests session with retry capabilities."""
+        session = requests.Session()
+        # Add headers to mimic a real browser
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        })
+        return session
+    
+    def _smart_delay(self, url: str):
+        """
+        Implement smart delay to avoid rate limiting.
+        Tracks delays per domain and uses random jitter.
+        """
+        domain = urlparse(url).netloc
+        current_time = time.time()
+        
+        # Check if we need to delay for this domain
+        if domain in self.domain_delays:
+            elapsed = current_time - self.domain_delays[domain]
+            if elapsed < self.request_delay:
+                sleep_time = self.request_delay - elapsed + random.uniform(0.1, 0.5)  # Add jitter
+                time.sleep(sleep_time)
+        
+        # Update last request time for this domain
+        self.domain_delays[domain] = current_time
+    
+    def _make_request(self, url: str, max_retries: int = 3) -> Optional[requests.Response]:
+        """Make HTTP request with smart delay and retry logic."""
+        for attempt in range(max_retries):
+            try:
+                self._smart_delay(url)
+                response = self.session.get(url, timeout=30)
+                response.raise_for_status()
+                
+                # Check if we're being rate limited
+                if response.status_code == 429:
+                    retry_after = int(response.headers.get('Retry-After', 30))
+                    logger.warning(f"Rate limited. Retrying after {retry_after} seconds")
+                    time.sleep(retry_after)
+                    continue
+                    
+                return response
+                
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Request attempt {attempt + 1} failed for {url}: {e}")
+                if attempt < max_retries - 1:
+                    sleep_time = (2 ** attempt) + random.uniform(0.1, 1.0)
+                    time.sleep(sleep_time)
+                else:
+                    logger.error(f"All request attempts failed for {url}: {e}")
+                    return None
+        
+        return None
     
     def convert_stars_to_number(self, stars: str) -> Optional[float]:
         """Convert star string (e.g., '★★½') to numeric value.
@@ -121,7 +186,7 @@ class LetterboxdScraper:
                 'is_liked': is_liked
             })
     
-    def scrape_user_page(self, data: Dict, username: str, page_num: int) -> bool:
+    def scrape_user_page(self, data: Dict, username: str, page_num: int) -> Tuple[bool, int]:
         """Scrape a single Letterboxd page for the given user.
         
         Args:
@@ -130,19 +195,17 @@ class LetterboxdScraper:
             page_num: Page number to scrape
             
         Returns:
-            True if there are more pages to scrape, False otherwise
+            Tuple of (has_next_page, films_processed_count)
         """
         url = f"https://letterboxd.com/{username}/films/by/date/page/{page_num}/"
         
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-        except requests.RequestException as e:
-            logger.error(f"Failed to fetch page {page_num} for user {username}: {e}")
-            return False
+        response = self._make_request(url)
+        if not response:
+            return False, 0
             
         soup = BeautifulSoup(response.text, 'html.parser')
         film_items = soup.select('ul.poster-list li') or soup.select('ul.grid li')
+        films_processed = 0
         
         for item in film_items:
             div = item.select_one('div.react-component') or item.select_one('div.linked-film-poster')
@@ -165,9 +228,63 @@ class LetterboxdScraper:
             # Extract like status
             is_liked = item.select_one('span.like') is not None
             self.record_review_or_watch(data, username, film_id, rating, is_liked)
+            films_processed += 1
 
         # Check for next page
-        return bool(soup.select_one('div.pagination a.next'))
+        return bool(soup.select_one('div.pagination a.next')), films_processed
+    
+    def scrape_user_data(self, username: str, users_collection: Collection, films_collection: Collection) -> bool:
+        """Scrape data for a single user."""
+        logger.info(f"Scraping data for user: {username}")
+        
+        data = {
+            "users": {username: {"reviews": [], "watches": []}},
+            "films": {}
+        }
+        
+        data['users'][username]['last_update_time'] = datetime.now(timezone.utc)
+        page_num = 1
+        total_films = 0
+        
+        while True:
+            logger.info(f"Scraping {username} page {page_num}...")
+            
+            has_next_page, films_processed = self.scrape_user_page(data, username, page_num)
+            total_films += films_processed
+            
+            if not has_next_page or films_processed == 0:
+                break
+                
+            page_num += 1
+        
+        # Upload to MongoDB
+        if username in data['users']:  # CORRECTED: Check 'users' instead of 'user'
+            user_data = data['users'][username]
+            self.upsert_collection(users_collection, {"username": username}, {
+                "username": username,
+                "reviews": user_data['reviews'],
+                "watches": user_data.get('watches', []),
+                "last_update_time": user_data['last_update_time']
+            })
+            
+        for film_id, film_data in data['films'].items():
+            films_collection.update_one(
+                {"film_id": film_id},
+                {
+                    "$set": {
+                        "film_title": film_data['title'],
+                        "film_link": film_data['link']
+                    },
+                    "$push": {
+                        "reviews": {"$each": film_data['reviews']},
+                        "watches": {"$each": film_data['watches']}
+                    }
+                },
+                upsert=True
+            )
+        
+        logger.info(f"Completed scraping {username} with {total_films} films processed")
+        return True
     
     def upsert_collection(self, collection: Collection, match: Dict, data: Dict):
         """Helper function to upsert MongoDB document.
@@ -185,61 +302,36 @@ class LetterboxdScraper:
         films_collection_name: str, 
         usernames: List[str]
     ):
-        """Scrape data for multiple Letterboxd users.
+        """Scrape data for multiple Letterboxd users in parallel.
         
         Args:
             users_collection_name: Name of the MongoDB users collection
             films_collection_name: Name of the MongoDB films collection
             usernames: List of Letterboxd usernames to scrape
         """
-        data = {
-            "users": {username: {"reviews": [], "watches": []} for username in usernames},
-            "films": {}
-        }
-
-        for username in usernames:
-            logger.info(f"Scraping data for user: {username}")
-            data['users'][username]['last_update_time'] = datetime.now(timezone.utc)
-            page_num = 1
-            
-            while True:
-                logger.info(f"Scraping {username} page {page_num}...")
-                time.sleep(self.request_delay)
-                
-                has_next_page = self.scrape_user_page(data, username, page_num)
-                if not has_next_page:
-                    break
-                    
-                page_num += 1
-
-        # Upload to MongoDB
-        logger.info("Uploading scraped data to MongoDB...")
         users_collection = self.db[users_collection_name]
         films_collection = self.db[films_collection_name]
-
-        for username, user_data in data['users'].items():
-            self.upsert_collection(users_collection, {"username": username}, {
-                "username": username,
-                "reviews": user_data['reviews'],
-                "watches": user_data.get('watches', []),
-                "last_update_time": user_data['last_update_time']
-            })
+        
+        # Use ThreadPoolExecutor for parallel processing
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # Submit all scraping tasks
+            future_to_user = {
+                executor.submit(self.scrape_user_data, username, users_collection, films_collection): username 
+                for username in usernames
+            }
             
-        for film_id, film_data in data['films'].items():
-            films_collection.update_one(
-                {"film_id": film_id},
-                {
-                    "$set": {
-                        "film_title": film_data['title'],
-                        "film_link": film_data['link'],
-                        "reviews": {"$each": film_data['reviews']},
-                        "watches": {"$each": film_data['watches']}
-                    }
-                },
-                upsert=True
-            )
-
-        logger.info("Data scraped and saved to database")
+            # Process results as they complete
+            successful_scrapes = 0
+            for future in as_completed(future_to_user):
+                username = future_to_user[future]
+                try:
+                    success = future.result()
+                    if success:
+                        successful_scrapes += 1
+                except Exception as e:
+                    logger.error(f"Error scraping user {username}: {e}")
+        
+        logger.info(f"Completed scraping {successful_scrapes}/{len(usernames)} users")
     
     def get_films_to_update(self, films_collection, scrape_all_films=False):
         """
@@ -339,6 +431,41 @@ class LetterboxdScraper:
         }
         
         return films_collection.find(final_query)
+    
+    def scrape_film_metadata(self, film: Dict, films_collection: Collection) -> bool:
+        """Scrape metadata for a single film."""
+        film_id = film['film_id']
+        film_link = film.get('film_link')
+        
+        if not film_link:
+            return False
+
+        logger.info(f"Scraping metadata for {film['film_title']} ({film_id})...")
+        
+        response = self._make_request(film_link)
+        if not response:
+            return False
+            
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Metadata extraction
+        try:
+            metadata = self.extract_film_metadata(soup)
+            current_time = datetime.now(timezone.utc)
+            
+            films_collection.update_one(
+                {"film_id": film_id},
+                {
+                    "$set": {
+                        "metadata": metadata,
+                        "last_metadata_update_time": current_time
+                    }
+                }
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error extracting metadata for {film['film_title']} ({film_id}): {e}")
+            return False
         
     def extract_film_metadata(self, soup: BeautifulSoup) -> Dict:
         """Extract metadata from a film's BeautifulSoup page.
@@ -426,52 +553,41 @@ class LetterboxdScraper:
         return metadata
     
     def scrape_films_data(self, films_collection_name: str, scrape_all_films: bool = False):
-        """Scrape metadata for films.
+        """Scrape metadata for films in parallel.
         
         Args:
             films_collection_name: Name of the MongoDB films collection
             scrape_all_films: Whether to scrape all films or only those missing metadata
         """
         films_collection = self.db[films_collection_name]
-
-        films_to_update = self.get_films_to_update(films_collection, scrape_all_films)
-
-        for film in films_to_update:
-            film_id = film['film_id']
-            film_link = film.get('film_link')
+        films_to_update = list(self.get_films_to_update(films_collection, scrape_all_films))
+        
+        if not films_to_update:
+            logger.info("No films need metadata updates")
+            return
+        
+        logger.info(f"Scraping metadata for {len(films_to_update)} films")
+        
+        # Use ThreadPoolExecutor for parallel processing
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # Submit all film scraping tasks
+            future_to_film = {
+                executor.submit(self.scrape_film_metadata, film, films_collection): film['film_id'] 
+                for film in films_to_update
+            }
             
-            if not film_link:
-                continue
-
-            logger.info(f"Scraping metadata for {film['film_title']} ({film_id})...")
-            time.sleep(self.request_delay)
-            
-            try:
-                response = requests.get(film_link)
-                response.raise_for_status()
-            except requests.RequestException as e:
-                logger.error(f"Failed to fetch film page {film_link}: {e}")
-                continue
-                
-            soup = BeautifulSoup(response.text, 'html.parser')
-
-            # Metadata extraction
-            try:
-                metadata = self.extract_film_metadata(soup)
-                current_time = datetime.now(timezone.utc)
-                
-                films_collection.update_one(
-                    {"film_id": film_id},
-                    {
-                        "$set": {
-                            "metadata": metadata,
-                            "last_metadata_update_time": current_time
-                        }
-                    }
-                )
-            except Exception as e:
-                logger.error(f"Error extracting metadata for {film['film_title']} ({film_id}): {e}")
-                continue
+            # Process results as they complete
+            successful_scrapes = 0
+            for future in as_completed(future_to_film):
+                film_id = future_to_film[future]
+                try:
+                    success = future.result()
+                    if success:
+                        successful_scrapes += 1
+                except Exception as e:
+                    logger.error(f"Error scraping film {film_id}: {e}")
+        
+        logger.info(f"Completed scraping metadata for {successful_scrapes}/{len(films_to_update)} films")
 
 
 def main():
@@ -499,8 +615,12 @@ def main():
     
     # Initialize and run scraper
     scraper = LetterboxdScraper(mongo_uri, db_name)
+    
+    # Scrape user data in parallel
     scraper.scrape_users_data(users_collection_name, films_collection_name, usernames)
-    scraper.scrape_films_data(films_collection_name)
+    
+    # Scrape film metadata in parallel
+    # scraper.scrape_films_data(films_collection_name)
 
 
 if __name__ == "__main__":
