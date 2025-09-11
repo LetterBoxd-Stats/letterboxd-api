@@ -866,7 +866,7 @@ def main():
     #     return
     
     # Scrape user data in parallel
-    # scraper.scrape_users_data(users_collection_name, films_collection_name, usernames)
+    scraper.scrape_users_data(users_collection_name, films_collection_name, usernames)
     
     # Scrape film metadata in parallel
     scraper.scrape_films_data(films_collection_name)
