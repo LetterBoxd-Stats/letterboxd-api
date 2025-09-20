@@ -62,30 +62,31 @@ Returns a paginated list of scraped film entries according to the query paramete
 					"user": "nkilpatrick",
 					"is_liked": false
 				}
-			]
-		},
-		{
-			"film_id": "51621",
-			"film_link": "letterboxd.com/film/good-will-hunting/",
-			"film_title": "Good Will Hunting",
-			"avg_rating": 4.5,
-			"like_ratio": 1,
-			"num_likes": 1,
-			"num_ratings": 1,
-			"num_watches": 1,
-			"reviews": [
-				{
-					"user": "samuelmgaines",
-					"rating": 4.5,
-					"is_liked": true
-				}
 			],
-			"watches": []
+			"last_metadata_update_time": "Thu, 11 Sep 2025 06:27:09 GMT",
+			"metadata": {
+				"actors": ["Leonardo DiCaprio"],
+				"avg_rating": 4.03,
+				"backdrop_url": "https://fake-url.com",
+				"crew": [
+					{
+						"name": "Christopher Nolan",
+						"role": "director"
+					}
+				],
+				"description": "A good movie about dreams and stuff",
+				"directors": ["Christopher Nolan"],
+				"genres": ["Sci-Fi"],
+				"runtime": 124,
+				"studios": ["Movie Studio"],
+				"themes": ["Dreaming"],
+				"year": 2015
+			}
 		}
 	],
 	"page": 1,
-	"per_page": 2,
-	"total_pages": 8,
+	"per_page": 1,
+	"total_pages": 16,
 	"total_films": 16
 }
 ```
@@ -129,7 +130,25 @@ Query parameters:
 			"user": "nkilpatrick",
 			"is_liked": false
 		}
-	]
+	],
+	"metadata": {
+		"actors": ["Leonardo DiCaprio"],
+		"avg_rating": 4.03,
+		"backdrop_url": "https://fake-url.com",
+		"crew": [
+			{
+				"name": "Christopher Nolan",
+				"role": "director"
+			}
+		],
+		"description": "A good movie about dreams and stuff",
+		"directors": ["Christopher Nolan"],
+		"genres": ["Sci-Fi"],
+		"runtime": 124,
+		"studios": ["Movie Studio"],
+		"themes": ["Dreaming"],
+		"year": 2015
+	}
 }
 ```
 
