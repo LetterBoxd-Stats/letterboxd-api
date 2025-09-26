@@ -165,205 +165,154 @@ class LetterboxdScraper:
         """
         logger.info("Validating Letterboxd page structure...")
         
-        test_cases = [
-            self._validate_user_page_structure,
-            self._validate_film_page_structure,
-            self._validate_film_list_structure,
-            self._validate_pagination_structure
-        ]
+        # Test film page (using a popular film as example)
+        film_url = "https://letterboxd.com/film/the-godfather/"
+        film_success = self._validate_film_page(film_url)
         
-        all_passed = True
+        # Test user page (using a popular user as example)
+        user_url = "https://letterboxd.com/devinbaron/films/by/date/page/2/"
+        user_success = self._validate_user_page(user_url)
         
-        for test_case in test_cases:
-            try:
-                if not test_case():
-                    all_passed = False
-                    logger.error(f"Validation failed: {test_case.__name__}")
-            except Exception as e:
-                logger.error(f"Validation error in {test_case.__name__}: {e}")
-                all_passed = False
-        
-        if all_passed:
-            logger.info("All Letterboxd structure validations passed!")
-        else:
-            logger.error("Letterboxd structure validations failed! Aborting scrape.")
-        
-        return all_passed
-
-    def _validate_user_page_structure(self) -> bool:
-        """Validate that user pages have the expected structure."""
-        # Test with a known public user profile
-        test_user = "devinbaron"  # Using one of your usernames
-        url = f"https://letterboxd.com/{test_user}/films/by/date/"
-        
-        response = self._make_request(url)
-        if not response:
-            logger.error(f"Failed to fetch test user page: {url}")
-            return False
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Check critical selectors
-        critical_selectors = [
-            'ul.poster-list li',  # Film items in grid view
-            'ul.grid li',         # Film items in list view (fallback)
-            'div.pagination',     # Pagination container
-            'div.react-component', # Film poster components
-            'span.rating',        # Rating stars
-            'span.like'           # Like indicator
-        ]
-        
-        for selector in critical_selectors:
-            elements = soup.select(selector)
-            if not elements:
-                logger.warning(f"Selector not found on user page: {selector}")
-                # Don't fail immediately for all selectors, some might be optional
-        
-        # Check for essential elements
-        essential_elements = [
-            ('film items', bool(soup.select('ul.poster-list li') or soup.select('ul.grid li'))),
-            ('pagination', bool(soup.select_one('div.pagination'))),
-            ('film posters', bool(soup.select('div[data-film-id]'))),
-        ]
-        
-        for element_name, exists in essential_elements:
-            if not exists:
-                logger.error(f"Essential element missing from user page: {element_name}")
-                return False
-        
-        logger.info("User page structure validation passed")
-        return True
-
-    def _validate_film_page_structure(self) -> bool:
-        """Validate that film pages have the expected structure."""
-        # Test with a known film
-        test_films = [
-            "https://letterboxd.com/film/the-shawshank-redemption/",
-            "https://letterboxd.com/film/pulp-fiction/",
-            "https://letterboxd.com/film/the-dark-knight/"
-        ]
-        
-        for film_url in test_films:
-            response = self._make_request(film_url)
-            if not response:
-                logger.error(f"Failed to fetch test film page: {film_url}")
-                continue  # Try next film
-            
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Check critical metadata selectors
-            critical_selectors = [
-                'a[href*="/films/year/"]',           # Year
-                'div#tab-genres a[href*="/films/genre/"]',  # Genres
-                'div.truncate p',                    # Description
-                'a[href*="/director/"]',             # Directors
-                'a[href*="/actor/"]',                # Actors
-                'div#tab-crew',                      # Crew section
-                'a[href*="/studio/"]',               # Studios
-                'meta[name="twitter:data2"]',        # Average rating
-                'div.backdrop-wrapper'               # Backdrop
-            ]
-            
-            found_selectors = 0
-            for selector in critical_selectors:
-                elements = soup.select(selector)
-                if elements:
-                    found_selectors += 1
-                else:
-                    logger.warning(f"Selector not found on film page {film_url}: {selector}")
-            
-            # Require at least 70% of critical selectors to be present
-            if found_selectors / len(critical_selectors) < 0.7:
-                logger.error(f"Film page structure significantly changed: {film_url}")
-                return False
-            
-            # Check for essential metadata
-            essential_metadata = [
-                ('year', soup.select_one('a[href*="/films/year/"]')),
-                ('title', soup.select_one('h1.film-title')),
-            ]
-            
-            for metadata_name, element in essential_metadata:
-                if not element:
-                    logger.error(f"Essential metadata missing from film page: {metadata_name}")
-                    return False
-        
-        logger.info("Film page structure validation passed")
-        return True
-
-    def _validate_film_list_structure(self) -> bool:
-        """Validate that film list items have the expected data attributes."""
-        test_user = "devinbaron"
-        url = f"https://letterboxd.com/{test_user}/films/by/date/page/1/"
-        
-        response = self._make_request(url)
-        if not response:
-            logger.error("Failed to fetch film list for validation")
-            return False
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        film_items = soup.select('ul.poster-list li') or soup.select('ul.grid li')
-        
-        if not film_items:
-            logger.error("No film items found in list")
-            return False
-        
-        # Check a sample of film items for required data attributes
-        sample_size = min(5, len(film_items))
-        valid_items = 0
-        
-        for i in range(sample_size):
-            item = film_items[i]
-            div = item.select_one('div.react-component') or item.select_one('div.linked-film-poster')
-            
-            if div and 'data-film-id' in div.attrs:
-                valid_items += 1
-                
-                # Check for optional but important attributes
-                if 'data-target-link' not in div.attrs:
-                    logger.warning("data-target-link attribute missing from film item")
-                if 'data-rating' not in div.attrs:
-                    logger.warning("data-rating attribute missing from film item")
-        
-        # Require at least 60% of sample items to be valid
-        if valid_items / sample_size < 0.6:
-            logger.error("Film item structure significantly changed")
-            return False
-        
-        logger.info("Film list structure validation passed")
-        return True
-
-    def _validate_pagination_structure(self) -> bool:
-        """Validate that pagination works as expected."""
-        test_user = "devinbaron"
-        url = f"https://letterboxd.com/{test_user}/films/by/date/page/1/"
-        
-        response = self._make_request(url)
-        if not response:
-            logger.error("Failed to fetch page for pagination validation")
-            return False
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        pagination = soup.select_one('div.pagination')
-        
-        if not pagination:
-            logger.warning("No pagination found - user might have only one page")
-            return True  # This isn't necessarily a failure
-        
-        # Check pagination elements
-        pagination_elements = pagination.select('a')
-        if not pagination_elements:
-            logger.warning("Pagination found but no links")
-            return True  # Not necessarily a failure
-        
-        # Check if next page link exists
-        next_page = pagination.select_one('a.next')
-        if not next_page:
-            logger.info("Single page of results - pagination validation passed")
+        if film_success and user_success:
+            logger.info("Letterboxd structure validation passed")
             return True
+        else:
+            logger.error("Letterboxd structure validation failed")
+            return False
+
+    def _validate_film_page(self, film_url: str) -> bool:
+        """Validate that a film page has the expected structure."""
+        logger.info(f"Validating film page: {film_url}")
         
-        logger.info("Pagination structure validation passed")
-        return True
+        response = self._make_request(film_url)
+        if not response:
+            logger.error(f"Failed to fetch film page: {film_url}")
+            return False
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Check for critical elements that our scraper depends on
+        required_selectors = [
+            # Film poster
+            'div.film-poster',
+            # Year link
+            'a[href*="/films/year/"]',
+            # Genres section
+            'div#tab-genres',
+            # Description
+            'div.truncate p',
+            # Backdrop (optional but commonly present)
+            'div.backdrop-wrapper'
+        ]
+        
+        missing_elements = []
+        for selector in required_selectors:
+            if not soup.select_one(selector):
+                missing_elements.append(selector)
+        
+        if missing_elements:
+            logger.error(f"Film page missing required elements: {missing_elements}")
+            return False
+        
+        # Additional validation: check if we can extract basic metadata
+        try:
+            test_metadata = self.extract_film_metadata(soup)
+            required_metadata_fields = ['year', 'genres', 'description', 'directors']
+            
+            for field in required_metadata_fields:
+                if not test_metadata.get(field):
+                    logger.warning(f"Film metadata field '{field}' is empty")
+            
+            logger.info("Film page structure validation passed")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Film metadata extraction test failed: {e}")
+            return False
+
+    def _validate_user_page(self, user_url: str) -> bool:
+        """Validate that a user page has the expected structure."""
+        logger.info(f"Validating user page: {user_url}")
+        
+        response = self._make_request(user_url)
+        if not response:
+            logger.error(f"Failed to fetch user page: {user_url}")
+            return False
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Check for critical elements that our user scraper depends on
+        required_selectors = [
+            # User profile section
+            'section.profile-header',
+            # Film grid/list
+            'ul.poster-list, ul.grid',
+            # Film poster elements (the main data containers)
+            'li div.react-component, li div.linked-film-poster',
+            # Rating elements (may not be present on all entries)
+            'span.rating',
+            # Pagination (if multiple pages)
+            'div.pagination'
+        ]
+        
+        missing_elements = []
+        for selector in required_selectors:
+            if not soup.select_one(selector):
+                missing_elements.append(selector)
+        
+        if missing_elements:
+            logger.error(f"User page missing required elements: {missing_elements}")
+            return False
+        
+        # Additional validation: test film data extraction
+        try:
+            # Create a mock data structure to test extraction
+            test_data = {
+                "users": {"test_user": {"reviews": [], "watches": []}},
+                "films": {}
+            }
+            
+            film_items = soup.select('ul.poster-list li') or soup.select('ul.grid li')
+            if not film_items:
+                logger.error("No film items found on user page")
+                return False
+            
+            # Test extraction on first few film items
+            test_count = min(3, len(film_items))
+            films_processed = 0
+            
+            for i in range(test_count):
+                item = film_items[i]
+                div = item.select_one('div.react-component') or item.select_one('div.linked-film-poster')
+                
+                film_id = self.extract_film_data(test_data, div)
+                if film_id:
+                    films_processed += 1
+                    
+                    # Test rating extraction
+                    rating = None
+                    if div:
+                        rating_str = div.get('data-rating')
+                        rating = float(rating_str) if rating_str else None
+                    
+                    if rating is None:
+                        rating_span = item.select_one('span.rating')
+                        if rating_span:
+                            rating = self.convert_stars_to_number(rating_span.text.strip())
+                    
+                    # Test like detection
+                    is_liked = item.select_one('span.like') is not None
+            
+            if films_processed == 0:
+                logger.error("Failed to extract any film data from user page")
+                return False
+                
+            logger.info(f"User page structure validation passed (tested {films_processed} films)")
+            return True
+            
+        except Exception as e:
+            logger.error(f"User page extraction test failed: {e}")
+            return False
 
     def _validate_response_headers(self, response: requests.Response) -> bool:
         """Validate that response headers indicate a successful request."""
@@ -861,9 +810,9 @@ def main():
     scraper = LetterboxdScraper(mongo_uri, db_name)
 
     # Run validation first
-    # if not scraper.validate_letterboxd_structure():
-    #     logger.error("Letterboxd structure validation failed. Aborting.")
-    #     return
+    if not scraper.validate_letterboxd_structure():
+        logger.error("Letterboxd structure validation failed. Aborting.")
+        return
     
     # Scrape user data in parallel
     scraper.scrape_users_data(users_collection_name, films_collection_name, usernames)

@@ -340,6 +340,7 @@ Logs are handled using Python's `logging` module and will appear in:
     ├── scrape.yml     # Scrape action configuration
 	├── stats.yml	   # Compute stats action configuration
 api/
+├── __init__.py
 ├── index.py           # Flask app and endpoints
 ├── config.py          # Logging and environment loading
 ├── db.py			   # Database configuration
