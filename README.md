@@ -4,6 +4,8 @@ This is a Flask-based API for scraping and storing [Letterboxd](https://letterbo
 
 Deployed on [Vercel](https://vercel.com), and configurable via environment variables.
 
+Production Base URL: https://letterboxd-api-zeta.vercel.app/
+
 ---
 
 ## Endpoints
