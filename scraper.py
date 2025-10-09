@@ -462,7 +462,23 @@ class LetterboxdScraper:
         
         # For films, we need to be more careful since multiple users contribute
         for film_id, film_data in data['films'].items():
-            # First remove any existing entries from this user
+            # Ensure film document exists
+            films_collection.update_one(
+                {"film_id": film_id},
+                {
+                    "$setOnInsert": {
+                        "film_id": film_id,
+                        "film_title": film_data.get("title"),
+                        "film_link": film_data.get("link"),
+                        "metadata": None,
+                        "reviews": [],
+                        "watches": []
+                    }
+                },
+                upsert=True
+            )
+
+            # Now safely remove and re-add user’s reviews/watches
             films_collection.update_one(
                 {"film_id": film_id},
                 {
@@ -472,23 +488,19 @@ class LetterboxdScraper:
                     }
                 }
             )
-            
-            # Then add the new entries
+
             if film_data['reviews']:
                 films_collection.update_one(
                     {"film_id": film_id},
-                    {
-                        "$push": {"reviews": {"$each": film_data['reviews']}}
-                    }
+                    {"$push": {"reviews": {"$each": film_data['reviews']}}}
                 )
-            
+
             if film_data['watches']:
                 films_collection.update_one(
                     {"film_id": film_id},
-                    {
-                        "$push": {"watches": {"$each": film_data['watches']}}
-                    }
+                    {"$push": {"watches": {"$each": film_data['watches']}}}
                 )
+
         
         logger.info(f"Completed scraping {username} with {total_films} films processed")
         return True
