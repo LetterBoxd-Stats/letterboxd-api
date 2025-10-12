@@ -331,16 +331,17 @@ Query parameters:
 
 These variables are loaded via dotenv for local development and should also be added to both your Vercel project settings and your GitHub Action repository secrets for production.
 
-| Secret Name                  | Description                                 |
-| ---------------------------- | ------------------------------------------- |
-| `DB_URI`                     | MongoDB connection URI                      |
-| `DB_NAME`                    | MongoDB database name                       |
-| `DB_USERS_COLLECTION`        | Collection name for user reviews            |
-| `DB_FILMS_COLLECTION`        | Collection name for film metadata           |
-| `DB_SUPERLATIVES_COLLECTION` | Collection name for superlatives            |
-| `LETTERBOXD_USERNAMES`       | Comma-separated list of usernames to scrape |
-| `ENV`                        | Set to `prod` or `dev`                      |
-| `FRONTEND_URL`               | The URL of your production frontend         |
+| Secret Name                  | Description                                  |
+| ---------------------------- | -------------------------------------------- |
+| `DB_URI`                     | MongoDB connection URI                       |
+| `DB_NAME`                    | MongoDB database name                        |
+| `DB_USERS_COLLECTION`        | Collection name for user reviews             |
+| `DB_FILMS_COLLECTION`        | Collection name for film metadata            |
+| `DB_SUPERLATIVES_COLLECTION` | Collection name for superlatives             |
+| `LETTERBOXD_USERNAMES`       | Comma-separated list of usernames to scrape  |
+| `LETTERBOXD_GENRES`          | Comma-separated list of genres in LetterBoxd |
+| `ENV`                        | Environment (`prod` or `dev`)                |
+| `FRONTEND_URL`               | The URL of your production frontend          |
 
 ---
 

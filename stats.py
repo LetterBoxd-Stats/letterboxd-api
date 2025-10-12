@@ -57,14 +57,19 @@ def compute_user_stats(db, users_collection_name, films_collection_name):
     films = {film['film_id']: film for film in films_collection.find({})}
     logging.info(f"Loaded {len(films)} films into memory.")
 
-    logging.info("Computing user statistics...")
+    # Get genres from environment variable
+    letterboxd_genres = os.getenv('LETTERBOXD_GENRES', '')
+    all_genres = [genre.strip() for genre in letterboxd_genres.split(',')] if letterboxd_genres else []
+    
+    if not all_genres:
+        logging.warning("LETTERBOXD_GENRES environment variable not found or empty, using default genres")
+        all_genres = [
+            "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary",
+            "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery",
+            "Romance", "Science Fiction", "Thriller", "War", "Western", "TV Movie"
+        ]
 
-    # Define all genres
-    all_genres = [
-        "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary",
-        "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery",
-        "Romance", "Science Fiction", "Thriller", "War", "Western", "TV Movie"
-    ]
+    logging.info("Computing user statistics...")
 
     for user in users:
         reviews = user.get('reviews', [])
@@ -303,13 +308,12 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     for user in users:
         if 'pairwise_agreement' in user['stats']:
             for other_user, stats in user['stats']['pairwise_agreement'].items():
-                if stats['num_shared'] >= 3:  # Minimum shared films
-                    agreeable_pairs.append({
-                        'user1': user['username'],
-                        'user2': other_user,
-                        'mean_abs_diff': stats['mean_abs_diff'],
-                        'num_shared': stats['num_shared']
-                    })
+                agreeable_pairs.append({
+                    'user1': user['username'],
+                    'user2': other_user,
+                    'mean_abs_diff': stats['mean_abs_diff'],
+                    'num_shared': stats['num_shared']
+                })
     
     agreeable_pairs = sorted([p for p in agreeable_pairs if p['mean_abs_diff'] is not None], 
                             key=lambda x: x['mean_abs_diff'])
@@ -402,6 +406,34 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third": [newest_users[2]['username']] if len(newest_users) > 2 else [],
         "third_value": newest_users[2]['stats']['avg_year_watched'] if len(newest_users) > 2 else None
     })
+
+    # Critic (Most reviews)
+    most_reviews_users = sorted([u for u in users if u['stats'].get('num_ratings') is not None], 
+                            key=lambda x: x['stats']['num_ratings'], reverse=True)
+    superlatives.append({
+        "name": "Critic",
+        "description": "User with the most film reviews",
+        "first": [most_reviews_users[0]['username']] if most_reviews_users else [],
+        "first_value": most_reviews_users[0]['stats']['num_ratings'] if most_reviews_users else None,
+        "second": [most_reviews_users[1]['username']] if len(most_reviews_users) > 1 else [],
+        "second_value": most_reviews_users[1]['stats']['num_ratings'] if len(most_reviews_users) > 1 else None,
+        "third": [most_reviews_users[2]['username']] if len(most_reviews_users) > 2 else [],
+        "third_value": most_reviews_users[2]['stats']['num_ratings'] if len(most_reviews_users) > 2 else None
+    })
+
+    # Movie Junkie (Most watches)
+    most_watches_users = sorted([u for u in users if u['stats'].get('num_watches') is not None], 
+                            key=lambda x: x['stats']['num_watches'], reverse=True)
+    superlatives.append({
+        "name": "Movie Junkie",
+        "description": "User with the most films watched",
+        "first": [most_watches_users[0]['username']] if most_watches_users else [],
+        "first_value": most_watches_users[0]['stats']['num_watches'] if most_watches_users else None,
+        "second": [most_watches_users[1]['username']] if len(most_watches_users) > 1 else [],
+        "second_value": most_watches_users[1]['stats']['num_watches'] if len(most_watches_users) > 1 else None,
+        "third": [most_watches_users[2]['username']] if len(most_watches_users) > 2 else [],
+        "third_value": most_watches_users[2]['stats']['num_watches'] if len(most_watches_users) > 2 else None
+    })
     
     # Film Superlatives
     
@@ -479,7 +511,177 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third": [disagreeable_films[2]['film_title']] if len(disagreeable_films) > 2 else [],
         "third_value": disagreeable_films[2]['stdev_rating'] if len(disagreeable_films) > 2 else None
     })
+
+    # Genre Superlatives (aggregated across all users)
+
+    # Most Watched Genre (total count across all users)
+    genre_total_counts = defaultdict(int)
+    genre_total_ratings = defaultdict(list)
+    genre_avg_ratings = {}
+
+    # Aggregate genre data across all users
+    for user in users:
+        if user['stats'].get('genre_stats'):
+            for genre, stats in user['stats']['genre_stats'].items():
+                genre_total_counts[genre] += stats['count']
+                if stats['avg_rating'] is not None:
+                    # Add the rating for each film in this genre (approximated by count * avg_rating)
+                    # This is a simplification - we'd need the actual ratings for perfect accuracy
+                    genre_total_ratings[genre].extend([stats['avg_rating']] * stats['count'])
+
+    # Calculate average ratings per genre
+    for genre, ratings in genre_total_ratings.items():
+        if ratings:
+            genre_avg_ratings[genre] = statistics.mean(ratings)
+
+    # Most Watched Genre
+    most_watched_genres = sorted(genre_total_counts.items(), key=lambda x: x[1], reverse=True)
+    superlatives.append({
+        "name": "Most Watched Genre",
+        "description": "Genre with the highest total watch count across all users",
+        "first": [most_watched_genres[0][0]] if most_watched_genres else [],
+        "first_value": most_watched_genres[0][1] if most_watched_genres else None,
+        "second": [most_watched_genres[1][0]] if len(most_watched_genres) > 1 else [],
+        "second_value": most_watched_genres[1][1] if len(most_watched_genres) > 1 else None,
+        "third": [most_watched_genres[2][0]] if len(most_watched_genres) > 2 else [],
+        "third_value": most_watched_genres[2][1] if len(most_watched_genres) > 2 else None
+    })
+
+    # Least Watched Genre (only genres that have been watched by at least one user)
+    least_watched_genres = sorted([(g, c) for g, c in genre_total_counts.items() if c > 0], 
+                                key=lambda x: x[1])
+    superlatives.append({
+        "name": "Least Watched Genre",
+        "description": "Genre with the lowest total watch count across all users",
+        "first": [least_watched_genres[0][0]] if least_watched_genres else [],
+        "first_value": least_watched_genres[0][1] if least_watched_genres else None,
+        "second": [least_watched_genres[1][0]] if len(least_watched_genres) > 1 else [],
+        "second_value": least_watched_genres[1][1] if len(least_watched_genres) > 1 else None,
+        "third": [least_watched_genres[2][0]] if len(least_watched_genres) > 2 else [],
+        "third_value": least_watched_genres[2][1] if len(least_watched_genres) > 2 else None
+    })
+
+    # Highest Rated Genre
+    highest_rated_genres = sorted([(g, r) for g, r in genre_avg_ratings.items()], 
+                                key=lambda x: x[1], reverse=True)
+    superlatives.append({
+        "name": "Best Genre",
+        "description": "Genre with the highest average rating across all users",
+        "first": [highest_rated_genres[0][0]] if highest_rated_genres else [],
+        "first_value": highest_rated_genres[0][1] if highest_rated_genres else None,
+        "second": [highest_rated_genres[1][0]] if len(highest_rated_genres) > 1 else [],
+        "second_value": highest_rated_genres[1][1] if len(highest_rated_genres) > 1 else None,
+        "third": [highest_rated_genres[2][0]] if len(highest_rated_genres) > 2 else [],
+        "third_value": highest_rated_genres[2][1] if len(highest_rated_genres) > 2 else None
+    })
+
+    # Lowest Rated Genre
+    lowest_rated_genres = sorted([(g, r) for g, r in genre_avg_ratings.items()], 
+                                key=lambda x: x[1])
+    superlatives.append({
+        "name": "Worst Genre",
+        "description": "Genre with the lowest average rating across all users",
+        "first": [lowest_rated_genres[0][0]] if lowest_rated_genres else [],
+        "first_value": lowest_rated_genres[0][1] if lowest_rated_genres else None,
+        "second": [lowest_rated_genres[1][0]] if len(lowest_rated_genres) > 1 else [],
+        "second_value": lowest_rated_genres[1][1] if len(lowest_rated_genres) > 1 else None,
+        "third": [lowest_rated_genres[2][0]] if len(lowest_rated_genres) > 2 else [],
+        "third_value": lowest_rated_genres[2][1] if len(lowest_rated_genres) > 2 else None
+    })
+
+    # Most Polarizing Genre (highest standard deviation in ratings)
+    genre_stddevs = {}
+    for genre, ratings in genre_total_ratings.items():
+        genre_stddevs[genre] = statistics.stdev(ratings)
+
+    most_polarizing_genres = sorted(genre_stddevs.items(), key=lambda x: x[1], reverse=True)
+    superlatives.append({
+        "name": "Most Polarizing Genre",
+        "description": "Genre with the highest standard deviation in ratings across all users",
+        "first": [most_polarizing_genres[0][0]] if most_polarizing_genres else [],
+        "first_value": most_polarizing_genres[0][1] if most_polarizing_genres else None,
+        "second": [most_polarizing_genres[1][0]] if len(most_polarizing_genres) > 1 else [],
+        "second_value": most_polarizing_genres[1][1] if len(most_polarizing_genres) > 1 else None,
+        "third": [most_polarizing_genres[2][0]] if len(most_polarizing_genres) > 2 else [],
+        "third_value": most_polarizing_genres[2][1] if len(most_polarizing_genres) > 2 else None
+    })
+
+    # Genre Enthusiasts & Critics (per genre)
+
+    # Get genres from environment variable
+    letterboxd_genres = os.getenv('LETTERBOXD_GENRES', '')
+    all_genres = [genre.strip() for genre in letterboxd_genres.split(',')] if letterboxd_genres else []
+
+    if not all_genres:
+        logging.warning("LETTERBOXD_GENRES environment variable not found or empty, using default genres")
+        all_genres = [
+            "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary",
+            "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery",
+            "Romance", "Science Fiction", "Thriller", "War", "Western", "TV Movie"
+        ]
+
+    for genre in all_genres:
+        genre_enthusiasts = []  # Users who rate this genre highest relative to their average
+        genre_critics = []      # Users who rate this genre lowest relative to their average
+        
+        for user in users:
+            stats = user.get('stats', {})
+            genre_stats = stats.get('genre_stats', {}).get(genre, {})
+            user_avg_rating = stats.get('avg_rating')
+            genre_avg_rating = genre_stats.get('avg_rating')
+            genre_count = genre_stats.get('count', 0)
+
+            if (genre_avg_rating is not None and user_avg_rating is not None):
+
+                # Calculate the difference: how much higher/lower they rate this genre vs their overall average
+                rating_difference = genre_avg_rating - user_avg_rating
+                
+                genre_enthusiasts.append({
+                    'username': user['username'],
+                    'difference': rating_difference,
+                    'genre_rating': genre_avg_rating,
+                    'user_avg': user_avg_rating,
+                    'count': genre_count
+                })
+                
+                genre_critics.append({
+                    'username': user['username'],
+                    'difference': rating_difference,
+                    'genre_rating': genre_avg_rating,
+                    'user_avg': user_avg_rating,
+                    'count': genre_count
+                })
+        
+        # Sort enthusiasts by highest positive difference
+        genre_enthusiasts.sort(key=lambda x: x['difference'], reverse=True)
+        
+        # Sort critics by lowest negative difference  
+        genre_critics.sort(key=lambda x: x['difference'])
     
+        # Add genre enthusiast superlative
+        superlatives.append({
+            "name": f"{genre} Enthusiast",
+            "description": f"User who rates {genre} films highest relative to their overall average",
+            "first": [f"{genre_enthusiasts[0]['username']}"] if genre_enthusiasts else [],
+            "first_value": genre_enthusiasts[0]['difference'] if genre_enthusiasts else None,
+            "second": [f"{genre_enthusiasts[1]['username']}"] if len(genre_enthusiasts) > 1 else [],
+            "second_value": genre_enthusiasts[1]['difference'] if len(genre_enthusiasts) > 1 else None,
+            "third": [f"{genre_enthusiasts[2]['username']}"] if len(genre_enthusiasts) > 2 else [],
+            "third_value": genre_enthusiasts[2]['difference'] if len(genre_enthusiasts) > 2 else None
+        })
+        
+        # Add genre critic superlative
+        superlatives.append({
+            "name": f"{genre} Critic", 
+            "description": f"User who rates {genre} films lowest relative to their overall average",
+            "first": [f"{genre_critics[0]['username']}"] if genre_critics else [],
+            "first_value": genre_critics[0]['difference'] if genre_critics else None,
+            "second": [f"{genre_critics[1]['username']}"] if len(genre_critics) > 1 else [],
+            "second_value": genre_critics[1]['difference'] if len(genre_critics) > 1 else None,
+            "third": [f"{genre_critics[2]['username']}"] if len(genre_critics) > 2 else [],
+            "third_value": genre_critics[2]['difference'] if len(genre_critics) > 2 else None
+        })
+        
     # Handle ties for all superlatives
     for superlative in superlatives:
         handle_ties(superlative, users, films)
@@ -568,7 +770,8 @@ def is_high_value_better(superlative_name):
     """Determine if higher values are better for this superlative"""
     high_value_better = [
         "Positive Polly", "Positive Polly (Comparative)", "Best Attention Span", 
-        "Modernist", "Best Movie", "Most Underrated Movie", "Hit or Miss"
+        "Modernist", "Best Movie", "Most Underrated Movie", "Hit or Miss",
+        "Critic", "Movie Junkie"
     ]
     return superlative_name in high_value_better
 
@@ -591,6 +794,10 @@ def get_user_value(user, superlative_name):
         return stats.get('avg_year_watched')
     elif superlative_name == "Modernist":
         return stats.get('avg_year_watched')
+    elif superlative_name == "Critic":
+        return stats.get('num_ratings')
+    elif superlative_name == "Movie Junkie":
+        return stats.get('num_watches')
     elif superlative_name == "BFFs" or superlative_name == "Enemies":
         # These are handled separately in the pairs logic
         return None
@@ -629,7 +836,7 @@ def main():
     logging.info("Connected to MongoDB")
 
     # Compute statistics
-    # compute_film_stats(db, films_collection_name)
+    compute_film_stats(db, films_collection_name)
     compute_user_stats(db, users_collection_name, films_collection_name)
     compute_superlatives(db, users_collection_name, films_collection_name, superlatives_collection_name)
 
