@@ -83,6 +83,7 @@ Returns a paginated list of scraped film entries according to the query paramete
 			"film_link": "letterboxd.com/film/inception/",
 			"film_title": "Inception",
 			"avg_rating": 3.75,
+			"stddev_rating": 0.354,
 			"like_ratio": 0.25,
 			"num_likes": 1,
 			"num_ratings": 2,
@@ -141,16 +142,13 @@ Returns a paginated list of scraped film entries according to the query paramete
 
 Returns the film entry for the specified `film_id`:
 
-Query parameters:
-
--   `include_films`: boolean, optional (default `false`). Determines whether to include `reviews` and `watches` arrays, which can be large.
-
 ```json
 {
 	"film_id": "34722",
 	"film_title": "Inception",
 	"film_link": "https://letterboxd.com/film/inception/",
 	"avg_rating": 3.75,
+	"stddev_rating": 0.354,
 	"like_ratio": 0.25,
 	"num_likes": 1,
 	"num_ratings": 2,
@@ -236,7 +234,18 @@ Returns all users and their scraped review data:
 					"mean_diff": 0.5,
 					"num_shared": 1
 				}
-			}
+			},
+			"genre_stats": {
+				"Horror": {
+					"count": 1,
+					"percentage": 33.333,
+					"avg_rating": 4.5,
+					"stddev": null
+				}
+			},
+			"avg_runtime": 102.3,
+			"total_runtime": 306.9,
+			"avg_year_watched": 2012.3
 		}
 	}
 ]
@@ -244,7 +253,11 @@ Returns all users and their scraped review data:
 
 ### `GET /users/{username}`
 
-Returns the user with the specified `username` and their scraped review data:
+Returns the user with the specified `username` and their scraped review data.
+
+Query parameters:
+
+-   `include_films`: boolean, optional (default `false`). Determines whether to include `reviews` and `watches` arrays, which can be large.
 
 ```json
 {
@@ -296,7 +309,18 @@ Returns the user with the specified `username` and their scraped review data:
 				"mean_diff": 0.5,
 				"num_shared": 1
 			}
-		}
+		},
+		"genre_stats": {
+			"Horror": {
+				"count": 1,
+				"percentage": 33.333,
+				"avg_rating": 4.5,
+				"stddev": null
+			}
+		},
+		"avg_runtime": 102.3,
+		"total_runtime": 306.9,
+		"avg_year_watched": 2012.3
 	}
 }
 ```
@@ -307,15 +331,18 @@ Returns the user with the specified `username` and their scraped review data:
 
 These variables are loaded via dotenv for local development and should also be added to both your Vercel project settings and your GitHub Action repository secrets for production.
 
-| Secret Name            | Description                                 |
-| ---------------------- | ------------------------------------------- |
-| `DB_URI`               | MongoDB connection URI                      |
-| `DB_NAME`              | MongoDB database name                       |
-| `DB_USERS_COLLECTION`  | Collection name for user reviews            |
-| `DB_FILMS_COLLECTION`  | Collection name for film metadata           |
-| `LETTERBOXD_USERNAMES` | Comma-separated list of usernames to scrape |
-| `ENV`                  | Set to `prod` or `dev`                      |
-| `FRONTEND_URL`         | The URL of your production frontend         |
+| Secret Name                  | Description                                  |
+| ---------------------------- | -------------------------------------------- |
+| `DB_URI`                     | MongoDB connection URI                       |
+| `DB_NAME`                    | MongoDB database name                        |
+| `DB_USERS_COLLECTION`        | Collection name for user reviews             |
+| `DB_FILMS_COLLECTION`        | Collection name for film metadata            |
+| `DB_SUPERLATIVES_COLLECTION` | Collection name for superlatives             |
+| `LETTERBOXD_USERNAMES`       | Comma-separated list of usernames to scrape  |
+| `LETTERBOXD_GENRES`          | Comma-separated list of genres in LetterBoxd |
+| `ENV`                        | Environment (`prod` or `dev`)                |
+| `FRONTEND_URL`               | The URL of your production frontend          |
+| `PORT`                       | The port to run the API on (default `5000`)  |
 
 ---
 

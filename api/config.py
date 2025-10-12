@@ -11,7 +11,9 @@ DB_URI = os.getenv('DB_URI')
 DB_NAME = os.getenv('DB_NAME')
 DB_USERS_COLLECTION = os.getenv('DB_USERS_COLLECTION')
 DB_FILMS_COLLECTION = os.getenv('DB_FILMS_COLLECTION')
+DB_SUPERLATIVES_COLLECTION = os.getenv('DB_SUPERLATIVES_COLLECTION')
 FRONTEND_URL = os.getenv('FRONTEND_URL')  # Default to localhost for dev
+PORT = int(os.getenv('PORT', 5000))  # Default to 5000 if not set
 
 def configure_logging():
     logging.basicConfig(
