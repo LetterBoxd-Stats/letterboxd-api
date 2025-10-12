@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from api.db import get_db
+import api.config
 from api.helpers import get_film_sort_fields, get_film_filter_query
 import logging
 import re
@@ -10,7 +11,7 @@ films_bp = Blueprint('films', __name__, url_prefix='/films')
 @films_bp.route('/')
 def get_films():
     db = get_db()
-    films_collection = db['films']
+    films_collection = db[api.config.DB_FILMS_COLLECTION]
 
     page = int(request.args.get('page', 1))
     limit = int(request.args.get('limit', 20))
@@ -62,7 +63,7 @@ def get_films():
 @films_bp.route('/<film_id>')
 def get_film(film_id):
     db = get_db()
-    film = db['films'].find_one({'film_id': film_id}, {'_id': 0})
+    film = db[api.config.DB_FILMS_COLLECTION].find_one({'film_id': film_id}, {'_id': 0})
     if film:
         return film
     return {'error': 'Film not found'}, 404
