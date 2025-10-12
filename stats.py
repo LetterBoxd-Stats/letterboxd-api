@@ -498,11 +498,11 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": overrated_films[2][1] if len(overrated_films) > 2 else None
     })
     
-    # 15. Hit or Miss (highest standard deviation)
+    # 15. Most Polarizing Movie (highest standard deviation)
     disagreeable_films = sorted([f for f in films if f.get('stdev_rating') is not None], 
                                key=lambda x: x['stdev_rating'], reverse=True)
     superlatives.append({
-        "name": "Hit or Miss",
+        "name": "Most Polarizing Movie",
         "description": "Film with the highest standard deviation in ratings",
         "first": [disagreeable_films[0]['film_title']] if disagreeable_films else [],
         "first_value": disagreeable_films[0]['stdev_rating'] if disagreeable_films else None,
@@ -770,7 +770,7 @@ def is_high_value_better(superlative_name):
     """Determine if higher values are better for this superlative"""
     high_value_better = [
         "Positive Polly", "Positive Polly (Comparative)", "Best Attention Span", 
-        "Modernist", "Best Movie", "Most Underrated Movie", "Hit or Miss",
+        "Modernist", "Best Movie", "Most Underrated Movie", "Most Polarizing Movie",
         "Critic", "Movie Junkie"
     ]
     return superlative_name in high_value_better
@@ -809,7 +809,7 @@ def get_film_value(film, superlative_name):
         return film.get('avg_rating')
     elif superlative_name == "Worst Movie":
         return film.get('avg_rating')
-    elif superlative_name == "Hit or Miss":
+    elif superlative_name == "Most Polarizing Movie":
         return film.get('stdev_rating')
     elif superlative_name == "Most Underrated Movie" or superlative_name == "Most Overrated Movie":
         # These are handled separately with diff calculation
