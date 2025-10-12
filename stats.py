@@ -421,11 +421,11 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": most_reviews_users[2]['stats']['num_ratings'] if len(most_reviews_users) > 2 else None
     })
 
-    # Movie Junkie (Most watches)
+    # Film Junkie (Most watches)
     most_watches_users = sorted([u for u in users if u['stats'].get('num_watches') is not None], 
                             key=lambda x: x['stats']['num_watches'], reverse=True)
     superlatives.append({
-        "name": "Movie Junkie",
+        "name": "Film Junkie",
         "description": "User with the most films watched",
         "first": [most_watches_users[0]['username']] if most_watches_users else [],
         "first_value": most_watches_users[0]['stats']['num_watches'] if most_watches_users else None,
@@ -771,7 +771,7 @@ def is_high_value_better(superlative_name):
     high_value_better = [
         "Positive Polly", "Positive Polly (Comparative)", "Best Attention Span", 
         "Modernist", "Best Movie", "Most Underrated Movie", "Most Polarizing Movie",
-        "Critic", "Movie Junkie"
+        "Critic", "Film Junkie"
     ]
     return superlative_name in high_value_better
 
@@ -796,7 +796,7 @@ def get_user_value(user, superlative_name):
         return stats.get('avg_year_watched')
     elif superlative_name == "Critic":
         return stats.get('num_ratings')
-    elif superlative_name == "Movie Junkie":
+    elif superlative_name == "Film Junkie":
         return stats.get('num_watches')
     elif superlative_name == "BFFs" or superlative_name == "Enemies":
         # These are handled separately in the pairs logic
