@@ -24,4 +24,4 @@ def home():
     return 'Hello, World!'
 
 if __name__ == '__main__':
-    app.run(debug=(api.config.ENV == 'dev'))
+    app.run(debug=(api.config.ENV == 'dev'), port=api.config.PORT)

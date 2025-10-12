@@ -342,6 +342,7 @@ These variables are loaded via dotenv for local development and should also be a
 | `LETTERBOXD_GENRES`          | Comma-separated list of genres in LetterBoxd |
 | `ENV`                        | Environment (`prod` or `dev`)                |
 | `FRONTEND_URL`               | The URL of your production frontend          |
+| `PORT`                       | The port to run the API on                   |
 
 ---
 
