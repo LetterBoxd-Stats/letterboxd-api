@@ -606,7 +606,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": most_polarizing_genres[2][1] if len(most_polarizing_genres) > 2 else None
     })
 
-    # Genre Enthusiasts & Critics (per genre)
+    # Genre Enthusiasts, Critics, and Watchers (per genre)
 
     # Get genres from environment variable
     letterboxd_genres = os.getenv('LETTERBOXD_GENRES', '')
@@ -623,7 +623,8 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     for genre in all_genres:
         genre_enthusiasts = []  # Users who rate this genre highest relative to their average
         genre_critics = []      # Users who rate this genre lowest relative to their average
-        
+        genre_watchers = []      # Users who watch this genre most frequently (by percentage)
+
         for user in users:
             stats = user.get('stats', {})
             genre_stats = stats.get('genre_stats', {}).get(genre, {})
@@ -651,12 +652,20 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
                     'user_avg': user_avg_rating,
                     'count': genre_count
                 })
-        
+
+                genre_watchers.append({
+                    'username': user['username'],
+                    'percentage': (genre_count / stats.get('num_watches', 1)) * 100
+                })
+
         # Sort enthusiasts by highest positive difference
         genre_enthusiasts.sort(key=lambda x: x['difference'], reverse=True)
         
         # Sort critics by lowest negative difference  
         genre_critics.sort(key=lambda x: x['difference'])
+
+        # Sort watchers by highest percentage
+        genre_watchers.sort(key=lambda x: x['percentage'], reverse=True)
     
         # Add genre enthusiast superlative
         superlatives.append({
@@ -681,45 +690,18 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
             "third": [f"{genre_critics[2]['username']}"] if len(genre_critics) > 2 else [],
             "third_value": genre_critics[2]['difference'] if len(genre_critics) > 2 else None
         })
-        
-    # Genre Percentage Superlatives (per genre)
-    # NEW FEATURE: For each genre, find which user watches the most of that genre by percentage
 
-    logging.info("Computing genre percentage superlatives...")
-    
-    for genre in all_genres:
-        genre_percentage_leaders = []
-        
-        for user in users:
-            stats = user.get('stats', {})
-            genre_stats = stats.get('genre_stats', {}).get(genre, {})
-            genre_percentage = genre_stats.get('percentage', 0)
-            genre_count = genre_stats.get('count', 0)
-            
-            # Only consider users who have watched at least one film in this genre
-            if genre_count > 0:
-                genre_percentage_leaders.append({
-                    'username': user['username'],
-                    'percentage': genre_percentage,
-                    'count': genre_count
-                })
-        
-        # Sort by percentage (highest first)
-        genre_percentage_leaders.sort(key=lambda x: x['percentage'], reverse=True)
-        
-        # Add genre percentage superlative
+        # Add genre watcher superlative
         superlatives.append({
-            "name": f"{genre} Aficionado",
-            "description": f"User who watches {genre} films most frequently (by percentage of total movies)",
-            "first": [f"{genre_percentage_leaders[0]['username']}"] if genre_percentage_leaders else [],
-            "first_value": genre_percentage_leaders[0]['percentage'] if genre_percentage_leaders else None,
-            "second": [f"{genre_percentage_leaders[1]['username']}"] if len(genre_percentage_leaders) > 1 else [],
-            "second_value": genre_percentage_leaders[1]['percentage'] if len(genre_percentage_leaders) > 1 else None,
-            "third": [f"{genre_percentage_leaders[2]['username']}"] if len(genre_percentage_leaders) > 2 else [],
-            "third_value": genre_percentage_leaders[2]['percentage'] if len(genre_percentage_leaders) > 2 else None
+            "name": f"{genre} Watcher",
+            "description": f"User who watches {genre} films most frequently (by percentage of watches)",
+            "first": [f"{genre_watchers[0]['username']}"] if genre_watchers else [],
+            "first_value": genre_watchers[0]['percentage'] if genre_watchers else None,
+            "second": [f"{genre_watchers[1]['username']}"] if len(genre_watchers) > 1 else [],
+            "second_value": genre_watchers[1]['percentage'] if len(genre_watchers) > 1 else None,
+            "third": [f"{genre_watchers[2]['username']}"] if len(genre_watchers) > 2 else [],
+            "third_value": genre_watchers[2]['percentage'] if len(genre_watchers) > 2 else None
         })
-    
-    logging.info(f"Computed {len(all_genres)} genre percentage superlatives")
         
     # Handle ties for all superlatives
     for superlative in superlatives:
