@@ -332,24 +332,34 @@ Returns a list of superlatives.
 ```json
 [
 	{
-		"description": "User with the highest average rating",
-		"first": ["Martendo24680"],
-		"first_value": 3.5062380038387717,
-		"name": "Positive Polly",
-		"second": ["devinbaron"],
-		"second_value": 3.4747774480712166,
-		"third": ["samuelmgaines"],
-		"third_value": 3.4536082474226806
+		"category": "User Superlatives",
+		"superlatives": [
+			{
+				"description": "User with the highest average rating",
+				"first": ["Martendo24680"],
+				"first_value": 3.5062380038387717,
+				"name": "Positive Polly",
+				"second": ["devinbaron"],
+				"second_value": 3.4747774480712166,
+				"third": ["samuelmgaines"],
+				"third_value": 3.4536082474226806
+			}
+		]
 	},
 	{
-		"description": "Film with the highest negative rating difference from Letterboxd average",
-		"first": ["La Haine"],
-		"first_value": -1.6349999999999998,
-		"name": "Most Overrated Movie",
-		"second": ["A Minecraft Movie", "Tangled"],
-		"second_value": -1.5099999999999998,
-		"third": [],
-		"third_value": null
+		"category": "Film Superlatives",
+		"superlatives": [
+			{
+				"description": "Film with the highest negative rating difference from Letterboxd average",
+				"first": ["La Haine"],
+				"first_value": -1.6349999999999998,
+				"name": "Most Overrated Movie",
+				"second": ["A Minecraft Movie", "Tangled"],
+				"second_value": -1.5099999999999998,
+				"third": [],
+				"third_value": null
+			}
+		]
 	}
 ]
 ```
