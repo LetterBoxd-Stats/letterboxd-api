@@ -243,14 +243,20 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     users = list(users_collection.find({"stats": {"$exists": True}}))
     films = list(films_collection.find({"num_ratings": {"$gte": 3}}))  # Only films with at least 3 ratings
     
-    superlatives = []
+    # Initialize categories
+    categories = {
+        "User Superlatives": [],
+        "Film Superlatives": [], 
+        "Genre Superlatives": [],
+        "Genre Preference Superlatives": []
+    }
     
     # User Superlatives
     
     # 1. Positive Polly (highest average rating)
     positive_users = sorted([u for u in users if u['stats'].get('avg_rating') is not None], 
                            key=lambda x: x['stats']['avg_rating'], reverse=True)
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Positive Polly",
         "description": "User with the highest average rating",
         "first": [positive_users[0]['username']] if positive_users else [],
@@ -264,7 +270,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     # 2. Positive Polly (Comparative) (most positive average rating difference)
     comp_positive_users = sorted([u for u in users if u['stats'].get('mean_diff') is not None], 
                                 key=lambda x: x['stats']['mean_diff'], reverse=True)
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Positive Polly (Comparative)",
         "description": "User with the most positive average rating difference compared to other users",
         "first": [comp_positive_users[0]['username']] if comp_positive_users else [],
@@ -278,7 +284,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     # 3. Negative Nelly (lowest average rating)
     negative_users = sorted([u for u in users if u['stats'].get('avg_rating') is not None], 
                            key=lambda x: x['stats']['avg_rating'])
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Negative Nelly",
         "description": "User with the lowest average rating",
         "first": [negative_users[0]['username']] if negative_users else [],
@@ -292,7 +298,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     # 4. Negative Nelly (Comparative) (most negative average rating difference)
     comp_negative_users = sorted([u for u in users if u['stats'].get('mean_diff') is not None], 
                                 key=lambda x: x['stats']['mean_diff'])
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Negative Nelly (Comparative)",
         "description": "User with the most negative average rating difference compared to other users",
         "first": [comp_negative_users[0]['username']] if comp_negative_users else [],
@@ -327,7 +333,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
             unique_pairs.append(pair)
             seen_pairs.add(pair_key)
     
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "BFFs",
         "description": "Pair of users with the lowest mean absolute rating difference",
         "first": [f"{unique_pairs[0]['user1']} & {unique_pairs[0]['user2']}"] if unique_pairs else [],
@@ -340,7 +346,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     
     # 6. Enemies (highest mean absolute difference)
     disagreeable_pairs = sorted(unique_pairs, key=lambda x: x['mean_abs_diff'], reverse=True)
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Enemies",
         "description": "Pair of users with the highest mean absolute rating difference",
         "first": [f"{disagreeable_pairs[0]['user1']} & {disagreeable_pairs[0]['user2']}"] if disagreeable_pairs else [],
@@ -354,7 +360,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     # 7. Best Attention Span (highest average runtime)
     runtime_users = sorted([u for u in users if u['stats'].get('avg_runtime') is not None], 
                           key=lambda x: x['stats']['avg_runtime'], reverse=True)
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Best Attention Span",
         "description": "User with the highest average movie runtime",
         "first": [runtime_users[0]['username']] if runtime_users else [],
@@ -368,7 +374,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     # 8. TikTok Brain (lowest average runtime)
     short_runtime_users = sorted([u for u in users if u['stats'].get('avg_runtime') is not None], 
                                 key=lambda x: x['stats']['avg_runtime'])
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "TikTok Brain",
         "description": "User with the lowest average movie runtime",
         "first": [short_runtime_users[0]['username']] if short_runtime_users else [],
@@ -382,7 +388,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     # 9. Unc (lowest average release year)
     oldest_users = sorted([u for u in users if u['stats'].get('avg_year_watched') is not None], 
                          key=lambda x: x['stats']['avg_year_watched'])
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Unc",
         "description": "User with the lowest average movie release year",
         "first": [oldest_users[0]['username']] if oldest_users else [],
@@ -396,7 +402,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     # 10. Modernist (highest average release year)
     newest_users = sorted([u for u in users if u['stats'].get('avg_year_watched') is not None], 
                          key=lambda x: x['stats']['avg_year_watched'], reverse=True)
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Modernist",
         "description": "User with the highest average movie release year",
         "first": [newest_users[0]['username']] if newest_users else [],
@@ -407,10 +413,10 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": newest_users[2]['stats']['avg_year_watched'] if len(newest_users) > 2 else None
     })
 
-    # Critic (Most reviews)
+    # 11. Critic (Most reviews)
     most_reviews_users = sorted([u for u in users if u['stats'].get('num_ratings') is not None], 
                             key=lambda x: x['stats']['num_ratings'], reverse=True)
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Critic",
         "description": "User with the most film reviews",
         "first": [most_reviews_users[0]['username']] if most_reviews_users else [],
@@ -421,10 +427,10 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": most_reviews_users[2]['stats']['num_ratings'] if len(most_reviews_users) > 2 else None
     })
 
-    # Film Junkie (Most watches)
+    # 12. Film Junkie (Most watches)
     most_watches_users = sorted([u for u in users if u['stats'].get('num_watches') is not None], 
                             key=lambda x: x['stats']['num_watches'], reverse=True)
-    superlatives.append({
+    categories["User Superlatives"].append({
         "name": "Film Junkie",
         "description": "User with the most films watched",
         "first": [most_watches_users[0]['username']] if most_watches_users else [],
@@ -437,10 +443,10 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
     
     # Film Superlatives
     
-    # 11. Best movie (highest average rating)
+    # 1. Best movie (highest average rating)
     best_films = sorted([f for f in films if f.get('avg_rating') is not None], 
                        key=lambda x: x['avg_rating'], reverse=True)
-    superlatives.append({
+    categories["Film Superlatives"].append({
         "name": "Best Movie",
         "description": "Film with the highest average rating (minimum 3 ratings)",
         "first": [best_films[0]['film_title']] if best_films else [],
@@ -451,10 +457,10 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": best_films[2]['avg_rating'] if len(best_films) > 2 else None
     })
     
-    # 12. Worst movie (lowest average rating)
+    # 2. Worst movie (lowest average rating)
     worst_films = sorted([f for f in films if f.get('avg_rating') is not None], 
                         key=lambda x: x['avg_rating'])
-    superlatives.append({
+    categories["Film Superlatives"].append({
         "name": "Worst Movie",
         "description": "Film with the lowest average rating (minimum 3 ratings)",
         "first": [worst_films[0]['film_title']] if worst_films else [],
@@ -465,8 +471,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": worst_films[2]['avg_rating'] if len(worst_films) > 2 else None
     })
     
-    # 13. Most underrated movie (highest positive difference from letterboxd average)
-    # Note: This requires letterboxd average rating in film data
+    # 3. Most underrated movie (highest positive difference from letterboxd average)
     underrated_films = []
     for film in films:
         if film.get('avg_rating') is not None and film.get('metadata') is not None and film['metadata'].get('avg_rating') is not None:
@@ -474,7 +479,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
             underrated_films.append((film, diff))
     
     underrated_films = sorted(underrated_films, key=lambda x: x[1], reverse=True)
-    superlatives.append({
+    categories["Film Superlatives"].append({
         "name": "Most Underrated Movie",
         "description": "Film with the highest positive rating difference from Letterboxd average",
         "first": [underrated_films[0][0]['film_title']] if underrated_films else [],
@@ -485,9 +490,9 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": underrated_films[2][1] if len(underrated_films) > 2 else None
     })
     
-    # 14. Most overrated movie (highest negative difference from letterboxd average)
+    # 4. Most overrated movie (highest negative difference from letterboxd average)
     overrated_films = sorted(underrated_films, key=lambda x: x[1])
-    superlatives.append({
+    categories["Film Superlatives"].append({
         "name": "Most Overrated Movie",
         "description": "Film with the highest negative rating difference from Letterboxd average",
         "first": [overrated_films[0][0]['film_title']] if overrated_films else [],
@@ -498,10 +503,10 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": overrated_films[2][1] if len(overrated_films) > 2 else None
     })
     
-    # 15. Most Polarizing Movie (highest standard deviation)
+    # 5. Most Polarizing Movie (highest standard deviation)
     disagreeable_films = sorted([f for f in films if f.get('stdev_rating') is not None], 
                                key=lambda x: x['stdev_rating'], reverse=True)
-    superlatives.append({
+    categories["Film Superlatives"].append({
         "name": "Most Polarizing Movie",
         "description": "Film with the highest standard deviation in ratings",
         "first": [disagreeable_films[0]['film_title']] if disagreeable_films else [],
@@ -525,8 +530,6 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
             for genre, stats in user['stats']['genre_stats'].items():
                 genre_total_counts[genre] += stats['count']
                 if stats['avg_rating'] is not None:
-                    # Add the rating for each film in this genre (approximated by count * avg_rating)
-                    # This is a simplification - we'd need the actual ratings for perfect accuracy
                     genre_total_ratings[genre].extend([stats['avg_rating']] * stats['count'])
 
     # Calculate average ratings per genre
@@ -534,9 +537,9 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         if ratings:
             genre_avg_ratings[genre] = statistics.mean(ratings)
 
-    # Most Watched Genre
+    # 1. Most Watched Genre
     most_watched_genres = sorted(genre_total_counts.items(), key=lambda x: x[1], reverse=True)
-    superlatives.append({
+    categories["Genre Superlatives"].append({
         "name": "Most Watched Genre",
         "description": "Genre with the highest total watch count across all users",
         "first": [most_watched_genres[0][0]] if most_watched_genres else [],
@@ -547,10 +550,10 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": most_watched_genres[2][1] if len(most_watched_genres) > 2 else None
     })
 
-    # Least Watched Genre (only genres that have been watched by at least one user)
+    # 2. Least Watched Genre (only genres that have been watched by at least one user)
     least_watched_genres = sorted([(g, c) for g, c in genre_total_counts.items() if c > 0], 
                                 key=lambda x: x[1])
-    superlatives.append({
+    categories["Genre Superlatives"].append({
         "name": "Least Watched Genre",
         "description": "Genre with the lowest total watch count across all users",
         "first": [least_watched_genres[0][0]] if least_watched_genres else [],
@@ -561,10 +564,10 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": least_watched_genres[2][1] if len(least_watched_genres) > 2 else None
     })
 
-    # Highest Rated Genre
+    # 3. Highest Rated Genre
     highest_rated_genres = sorted([(g, r) for g, r in genre_avg_ratings.items()], 
                                 key=lambda x: x[1], reverse=True)
-    superlatives.append({
+    categories["Genre Superlatives"].append({
         "name": "Best Genre",
         "description": "Genre with the highest average rating across all users",
         "first": [highest_rated_genres[0][0]] if highest_rated_genres else [],
@@ -575,10 +578,10 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": highest_rated_genres[2][1] if len(highest_rated_genres) > 2 else None
     })
 
-    # Lowest Rated Genre
+    # 4. Lowest Rated Genre
     lowest_rated_genres = sorted([(g, r) for g, r in genre_avg_ratings.items()], 
                                 key=lambda x: x[1])
-    superlatives.append({
+    categories["Genre Superlatives"].append({
         "name": "Worst Genre",
         "description": "Genre with the lowest average rating across all users",
         "first": [lowest_rated_genres[0][0]] if lowest_rated_genres else [],
@@ -589,13 +592,14 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": lowest_rated_genres[2][1] if len(lowest_rated_genres) > 2 else None
     })
 
-    # Most Polarizing Genre (highest standard deviation in ratings)
+    # 5. Most Polarizing Genre (highest standard deviation in ratings)
     genre_stddevs = {}
     for genre, ratings in genre_total_ratings.items():
-        genre_stddevs[genre] = statistics.stdev(ratings)
+        if len(ratings) > 1:
+            genre_stddevs[genre] = statistics.stdev(ratings)
 
     most_polarizing_genres = sorted(genre_stddevs.items(), key=lambda x: x[1], reverse=True)
-    superlatives.append({
+    categories["Genre Superlatives"].append({
         "name": "Most Polarizing Genre",
         "description": "Genre with the highest standard deviation in ratings across all users",
         "first": [most_polarizing_genres[0][0]] if most_polarizing_genres else [],
@@ -606,7 +610,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         "third_value": most_polarizing_genres[2][1] if len(most_polarizing_genres) > 2 else None
     })
 
-    # Genre Enthusiasts, Critics, and Watchers (per genre)
+    # Genre Preference Superlatives
 
     # Get genres from environment variable
     letterboxd_genres = os.getenv('LETTERBOXD_GENRES', '')
@@ -653,6 +657,8 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
                     'count': genre_count
                 })
 
+            # Genre watchers (based on percentage)
+            if genre_count > 0:
                 genre_watchers.append({
                     'username': user['username'],
                     'percentage': (genre_count / stats.get('num_watches', 1)) * 100
@@ -668,7 +674,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         genre_watchers.sort(key=lambda x: x['percentage'], reverse=True)
     
         # Add genre enthusiast superlative
-        superlatives.append({
+        categories["Genre Preference Superlatives"].append({
             "name": f"{genre} Enthusiast",
             "description": f"User who rates {genre} films highest relative to their overall average",
             "first": [f"{genre_enthusiasts[0]['username']}"] if genre_enthusiasts else [],
@@ -680,7 +686,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         })
         
         # Add genre critic superlative
-        superlatives.append({
+        categories["Genre Preference Superlatives"].append({
             "name": f"{genre} Critic", 
             "description": f"User who rates {genre} films lowest relative to their overall average",
             "first": [f"{genre_critics[0]['username']}"] if genre_critics else [],
@@ -692,7 +698,7 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         })
 
         # Add genre watcher superlative
-        superlatives.append({
+        categories["Genre Preference Superlatives"].append({
             "name": f"{genre} Watcher",
             "description": f"User who watches {genre} films most frequently (by percentage of watches)",
             "first": [f"{genre_watchers[0]['username']}"] if genre_watchers else [],
@@ -704,14 +710,20 @@ def compute_superlatives(db, users_collection_name, films_collection_name, super
         })
         
     # Handle ties for all superlatives
-    for superlative in superlatives:
-        handle_ties(superlative, users, films)
+    for category_name, category_superlatives in categories.items():
+        for superlative in category_superlatives:
+            handle_ties(superlative, users, films)
     
-    # Insert all superlatives into the database
-    if superlatives:
-        superlatives_collection.insert_many(superlatives)
+    # Insert all categories into the database
+    for category_name, category_superlatives in categories.items():
+        if category_superlatives:  # Only insert categories that have superlatives
+            superlatives_collection.insert_one({
+                "category": category_name,
+                "superlatives": category_superlatives
+            })
     
-    logging.info(f"Computed {len(superlatives)} superlatives and saved to database.")
+    total_superlatives = sum(len(superlatives) for superlatives in categories.values())
+    logging.info(f"Computed {total_superlatives} superlatives across {len(categories)} categories and saved to database.")
 
 def handle_ties(superlative, users, films):
     """Handle ties for all positions in a superlative"""
@@ -857,8 +869,8 @@ def main():
     logging.info("Connected to MongoDB")
 
     # Compute statistics
-    compute_film_stats(db, films_collection_name)
-    compute_user_stats(db, users_collection_name, films_collection_name)
+    # compute_film_stats(db, films_collection_name)
+    # compute_user_stats(db, users_collection_name, films_collection_name)
     compute_superlatives(db, users_collection_name, films_collection_name, superlatives_collection_name)
 
 if __name__ == "__main__":
