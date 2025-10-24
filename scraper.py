@@ -719,6 +719,11 @@ class LetterboxdScraper:
                 href = a["href"].strip("/")
                 parts = href.split("/")
                 role = parts[0] if len(parts) >= 2 else None
+                
+                # Format the role: remove hyphens, replace with spaces, and capitalize all words
+                if role:
+                    role = role.replace('-', ' ').title()
+                
                 crew.append({
                     "name": a.get_text(strip=True),
                     "role": role
