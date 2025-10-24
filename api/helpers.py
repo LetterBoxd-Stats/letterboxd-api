@@ -58,7 +58,8 @@ def get_film_filter_query(args):
         'metadata.actors',
         'metadata.studios', 
         'metadata.themes',
-        'metadata.description'
+        'metadata.description',
+        'film_title'
     ]
     
     for field in text_fields:

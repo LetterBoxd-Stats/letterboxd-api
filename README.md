@@ -36,6 +36,7 @@ Returns a simple greeting.
 
     **Text Field Filters**
 
+-   `film_title`: string, optional - Comma-separated list of film title substring (e.g., `godfather,part`)
 -   `directors`: string, optional - Comma-separated list of director name substrings (e.g., `directors=Nolan,Christopher`)
 -   `actors`: string, optional - Comma-separated list of actor name substrings (e.g., `actors=Leo,DeCap`)
 -   `studios`: string, optional - Comma-separated list of studio name substrings (e.g., `studios=Warner,Universal`)
