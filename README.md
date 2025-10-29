@@ -365,6 +365,36 @@ Returns a list of superlatives.
 ]
 ```
 
+### `GET /predict/{film_id}`
+
+Returns a list of rating and like predictions for each user for the given film.
+
+```json
+{
+	"film_id": "51816",
+	"film_title": "The Godfather Part II",
+	"predictions": [
+		{
+			"already_rated": false,
+			"already_watched": false,
+			"film_id": "51816",
+			"predicted_like": true,
+			"predicted_rating": 3.49,
+			"username": "samuelmgaines"
+		},
+		{
+			"already_rated": true,
+			"already_watched": true,
+			"film_id": "51816",
+			"predicted_like": true,
+			"predicted_rating": 3.5,
+			"username": "devinbaron"
+		}
+	],
+	"total_users": 2
+}
+```
+
 ---
 
 ## Environment Variables
@@ -452,6 +482,7 @@ Logs are handled using Python's `logging` module and will appear in:
 ├──workflows/
     ├── scrape.yml     # Scrape action configuration
 	├── stats.yml	   # Compute stats action configuration
+├── CODEOWNERS		   # List of codeowners that must approve PR
 api/
 ├── __init__.py
 ├── index.py           # Flask app and endpoints
@@ -461,11 +492,12 @@ api/
 ├── routes/
 	├── films.py	   # Logic for films routes
 	├── users.py	   # Logic for users routes
+scrape/
+├── scraper.py		   # Scraping functionality
+├── stats.py		   # Stats computation
 .env                   # Local environment variables (not in repository)
 .gitignore
 README.md
 requirements.txt
-scraper.py             # Scraping functionality
-stats.py			   # Stats computation
 vercel.json
 ```

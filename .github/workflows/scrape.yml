@@ -29,12 +29,13 @@ jobs:
                   echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
                   echo "DB_USERS_COLLECTION=${{ secrets.DB_USERS_COLLECTION }}" >> .env
                   echo "DB_FILMS_COLLECTION=${{ secrets.DB_FILMS_COLLECTION }}" >> .env
+                  echo "DB_MODELS_COLLECTION=${{ secrets.DB_MODELS_COLLECTION }}" >> .env
                   echo "DB_SUPERLATIVES_COLLECTION=${{ secrets.DB_SUPERLATIVES_COLLECTION }}" >> .env
                   echo "LETTERBOXD_USERNAMES=${{ secrets.LETTERBOXD_USERNAMES }}" >> .env
                   echo "LETTERBOXD_GENRES=${{ secrets.LETTERBOXD_GENRES }}" >> .env
                   echo "ENV=${{ secrets.ENV }}" >> .env
 
             - name: Run scraper
-              run: python scraper.py
+              run: python -m scrape.scraper
             - name: Compute stats
-              run: python stats.py
+              run: python -m scrape.stats

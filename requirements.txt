@@ -39,3 +39,9 @@ typing_extensions==4.14.0
 urllib3==1.26.7
 Werkzeug==3.1.3
 zipp==3.23.0
+
+# --- Added for recommender system ---
+numpy==1.23.5
+pandas==2.2.3
+scikit-surprise==1.1.3
+scikit-learn==1.5.2
