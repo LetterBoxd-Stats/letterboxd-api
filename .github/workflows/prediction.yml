@@ -1,0 +1,36 @@
+name: Train Prediction Model
+
+on:
+    workflow_dispatch: # enables manual triggering
+
+jobs:
+    train_prediction_model:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v3
+
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: "3.11"
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.txt
+
+            - name: Set up environment variables
+              run: |
+                  echo "DB_URI=${{ secrets.DB_URI }}" >> .env
+                  echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+                  echo "DB_USERS_COLLECTION=${{ secrets.DB_USERS_COLLECTION }}" >> .env
+                  echo "DB_FILMS_COLLECTION=${{ secrets.DB_FILMS_COLLECTION }}" >> .env
+                  echo "DB_MODELS_COLLECTION=${{ secrets.DB_MODELS_COLLECTION }}" >> .env
+                  echo "DB_SUPERLATIVES_COLLECTION=${{ secrets.DB_SUPERLATIVES_COLLECTION }}" >> .env
+                  echo "ENV=${{ secrets.ENV }}" >> .env
+                  echo "LETTERBOXD_GENRES={{ secrets.LETTERBOXD_GENRES }}" >> .env
+
+            - name: Train prediction model
+              run: python -m prediction.train_model
