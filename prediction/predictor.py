@@ -1,5 +1,5 @@
 """
-Enhanced predictor.py with like prediction
+Enhanced predictor.py for XGBoost models
 """
 
 import pickle
@@ -8,6 +8,7 @@ from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
 import numpy as np
+import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ DB_URI = os.getenv("DB_URI")
 DB_NAME = os.getenv("DB_NAME")
 MODELS_COLLECTION = os.getenv("DB_MODELS_COLLECTION")
 USERS_COLLECTION = os.getenv("DB_USERS_COLLECTION")
+FILMS_COLLECTION = os.getenv("DB_FILMS_COLLECTION")
 
 # Cache for loaded model
 _model_cache = None
@@ -33,9 +35,12 @@ def get_model():
         db = client[DB_NAME]
         models_col = db[MODELS_COLLECTION]
         
+        # Try both model names for backward compatibility
         model_doc = models_col.find_one({"name": "predictor"})
         if not model_doc:
-            raise RuntimeError("No trained model found in MongoDB.")
+            model_doc = models_col.find_one({"name": "predictor"})
+            if not model_doc:
+                raise RuntimeError("No trained model found in MongoDB.")
         
         # Load rating model
         rating_model_bytes = base64.b64decode(model_doc["rating_model_b64"])
@@ -47,44 +52,232 @@ def get_model():
             like_model_bytes = base64.b64decode(model_doc["like_model_b64"])
             like_model = pickle.loads(like_model_bytes)
         
+        # Get feature columns and model info
+        feature_columns = model_doc.get("feature_columns", [])
+        model_type = model_doc.get("model_type", "unknown")
+        
         _model_cache = {
             "rating_model": rating_model,
             "like_model": like_model,
-            "has_like_model": model_doc.get("has_like_model", False)
+            "has_like_model": model_doc.get("has_like_model", False),
+            "feature_columns": feature_columns,
+            "model_type": model_type
         }
+        
+        logger.info(f"Loaded {model_type} model with {len(feature_columns)} features")
     
     return _model_cache
 
-def predict_like(model, username, film_id, film_data, predicted_rating):
+def predict_rating(model_dict, username, film_id, film_data):
+    """Predict rating using XGBoost model with proper feature engineering"""
+    try:
+        # Get user stats
+        user_stats = get_user_stats(username)
+        
+        # Get film stats
+        film_stats = get_film_stats(film_data)
+        
+        # Create feature vector
+        features = create_feature_vector(user_stats, film_stats, model_dict["feature_columns"])
+        
+        # Convert to DataFrame with proper column names
+        feature_df = pd.DataFrame([features], columns=model_dict["feature_columns"])
+        
+        # Predict rating
+        predicted_rating = model_dict["rating_model"].predict(feature_df)[0]
+        
+        # Clip to valid rating range
+        predicted_rating = max(0.5, min(5.0, float(predicted_rating)))
+        
+        return round(predicted_rating, 2)
+        
+    except Exception as e:
+        logger.error(f"Rating prediction failed for {username}, {film_id}: {e}")
+        return None
+
+def create_feature_vector(user_stats, film_stats, feature_columns):
+    """Create feature vector matching training features"""
+    # Default values for all possible features
+    feature_defaults = {
+        'user_avg_rating': 3.0,
+        'user_stdev_rating': 1.0,
+        'user_like_ratio': 0.5,
+        'user_num_ratings': 1,
+        'user_num_likes': 0,
+        'user_median_rating': 3.0,
+        'film_avg_rating': 3.0,
+        'film_like_ratio': 0.5,
+        'film_num_ratings': 1,
+        'film_letterboxd_avg': 3.0,
+        'film_runtime': 120,
+        'film_year': 2000,
+        'max_genre_rating': 3.0,
+        'min_genre_rating': 3.0,
+        'avg_genre_rating': 3.0,
+        'genre_rating_std': 0.0,
+        'total_genre_watches': 0,
+        'genre_coverage': 0.0,
+        'user_film_rating_diff': 0.0,
+        'film_user_avg_diff': 0.0
+    }
+    
+    # Update with actual values
+    feature_defaults.update(user_stats)
+    feature_defaults.update(film_stats)
+    
+    # Create feature vector in correct order
+    feature_vector = [feature_defaults.get(col, 0.0) for col in feature_columns]
+    
+    return feature_vector
+
+def get_user_stats(username):
+    """Get comprehensive user statistics for feature engineering"""
+    try:
+        client = MongoClient(DB_URI)
+        db = client[DB_NAME]
+        users_collection = db[USERS_COLLECTION]
+        
+        user_doc = users_collection.find_one(
+            {"username": username}, 
+            {"_id": 0, "stats": 1}
+        )
+        
+        if not user_doc or "stats" not in user_doc:
+            return get_default_user_stats()
+        
+        stats = user_doc["stats"]
+        
+        # Calculate genre compatibility stats
+        genre_stats = calculate_user_genre_stats(stats)
+        
+        user_data = {
+            'user_avg_rating': stats.get("avg_rating", 3.0),
+            'user_stdev_rating': stats.get("stdev_rating", 1.0),
+            'user_like_ratio': stats.get("like_ratio", 0.5),
+            'user_num_ratings': stats.get("num_ratings", 1),
+            'user_num_likes': stats.get("num_likes", 0),
+            'user_median_rating': stats.get("median_rating", 3.0),
+            **genre_stats
+        }
+        
+        return user_data
+        
+    except Exception as e:
+        logger.warning(f"Error getting stats for user {username}: {e}")
+        return get_default_user_stats()
+    finally:
+        client.close()
+
+def get_film_stats(film_data):
+    """Extract film statistics for feature engineering"""
+    try:
+        metadata = film_data.get("metadata", {})
+        genres = metadata.get("genres", [])
+        
+        film_stats = {
+            'film_avg_rating': film_data.get("avg_rating", 3.0),
+            'film_like_ratio': film_data.get("like_ratio", 0.5),
+            'film_num_ratings': film_data.get("num_ratings", 1),
+            'film_letterboxd_avg': metadata.get("avg_rating", 3.0),
+            'film_runtime': metadata.get("runtime", 120),
+            'film_year': metadata.get("year", 2000),
+            'film_genres': genres
+        }
+        
+        return film_stats
+        
+    except Exception as e:
+        logger.warning(f"Error getting film stats: {e}")
+        return get_default_film_stats()
+
+def calculate_user_genre_stats(user_stats):
+    """Calculate genre compatibility statistics"""
+    genre_stats_data = user_stats.get("genre_stats", {})
+    
+    if not genre_stats_data:
+        return {
+            'max_genre_rating': 3.0,
+            'min_genre_rating': 3.0,
+            'avg_genre_rating': 3.0,
+            'genre_rating_std': 0.0,
+            'total_genre_watches': 0,
+            'genre_coverage': 0.0
+        }
+    
+    genre_ratings = []
+    genre_counts = []
+    
+    for genre, stats in genre_stats_data.items():
+        if stats.get("avg_rating") is not None:
+            genre_ratings.append(stats["avg_rating"])
+            genre_counts.append(stats.get("count", 0))
+    
+    if genre_ratings:
+        return {
+            'max_genre_rating': max(genre_ratings),
+            'min_genre_rating': min(genre_ratings),
+            'avg_genre_rating': sum(genre_ratings) / len(genre_ratings),
+            'genre_rating_std': np.std(genre_ratings) if len(genre_ratings) > 1 else 0.0,
+            'total_genre_watches': sum(genre_counts),
+            'genre_coverage': len(genre_ratings) / len(genre_stats_data) if genre_stats_data else 0.0
+        }
+    else:
+        return {
+            'max_genre_rating': user_stats.get("avg_rating", 3.0),
+            'min_genre_rating': user_stats.get("avg_rating", 3.0),
+            'avg_genre_rating': user_stats.get("avg_rating", 3.0),
+            'genre_rating_std': user_stats.get("stdev_rating", 1.0),
+            'total_genre_watches': 0,
+            'genre_coverage': 0.0
+        }
+
+def predict_like(model_dict, username, film_id, film_data, predicted_rating):
     """Predict whether a user will like a film using the trained like model"""
     
     # If no like model is available, fall back to threshold-based approach
-    if not model.get("has_like_model") or model["like_model"] is None:
+    if not model_dict.get("has_like_model") or model_dict["like_model"] is None:
+        logger.info("Using fallback like prediction")
         return predicted_rating >= 3.5 if predicted_rating is not None else None
     
     try:
-        # Extract features for like prediction
-        film_avg_rating = film_data.get("avg_rating", 0)
-        film_like_ratio = film_data.get("like_ratio", 0)
+        # Get user and film stats
+        user_stats = get_user_stats(username)
+        film_stats = get_film_stats(film_data)
         
-        # In a real implementation, you'd want to cache user stats
-        # For now, we'll use a simplified approach
-        user_stats = get_user_like_stats(username)  # You'd need to implement this
-        
-        # Prepare feature vector (must match training features)
+        # Prepare features for like prediction (must match training)
         features = np.array([[
-            predicted_rating,           # Predicted rating
-            predicted_rating,           # Actual rating (same as predicted for new predictions)
-            film_avg_rating,           # Film's average rating
-            film_like_ratio,           # Film's like ratio
-            user_stats.get("like_rate", 0.5),  # User's historical like rate
-            user_stats.get("review_count", 1), # User's review count
-            abs(predicted_rating - film_avg_rating),  # Rating deviation
-            abs(predicted_rating - film_avg_rating),  # Predicted rating deviation (same)
+            predicted_rating,                           # actual_rating
+            predicted_rating,                           # svd_pred_rating (same as actual for now)
+            predicted_rating,                           # feature_pred_rating (same as actual for now)
+            user_stats['user_avg_rating'],             # user_avg_rating
+            film_stats['film_avg_rating'],             # film_avg_rating
+            user_stats['user_like_ratio'],             # user_like_ratio
+            film_stats['film_like_ratio'],             # film_like_ratio
+            user_stats['avg_genre_rating'],            # avg_genre_rating
+            user_stats['genre_coverage'],              # genre_coverage
+            abs(predicted_rating - user_stats['user_avg_rating']),  # personal_rating_deviation
+            abs(predicted_rating - film_stats['film_avg_rating']),  # community_rating_deviation
+            float(predicted_rating > user_stats['user_avg_rating']),  # rating_above_user_avg
+            float(predicted_rating > film_stats['film_avg_rating']),  # rating_above_film_avg
+            float(film_stats['film_avg_rating'] >= 4.0),  # high_rated_film
+            user_stats.get('user_rating_consistency', 0.5),  # user_rating_consistency
         ]])
         
+        # Convert to DataFrame with proper feature names
+        like_feature_names = [
+            'actual_rating', 'svd_pred_rating', 'feature_pred_rating',
+            'user_avg_rating', 'film_avg_rating', 'user_like_ratio', 'film_like_ratio',
+            'avg_genre_rating', 'genre_coverage', 'personal_rating_deviation',
+            'community_rating_deviation', 'rating_above_user_avg', 'rating_above_film_avg',
+            'high_rated_film', 'user_rating_consistency'
+        ]
+        
+        feature_df = pd.DataFrame(features, columns=like_feature_names)
+        
         # Predict like probability
-        like_prob = model["like_model"].predict_proba(features)[0][1]
+        like_prob = model_dict["like_model"].predict_proba(feature_df)[0][1]
+        
+        logger.debug(f"Like probability for {username}: {like_prob:.3f}")
         
         # Return True if probability > 0.5
         return like_prob > 0.5
@@ -94,56 +287,31 @@ def predict_like(model, username, film_id, film_data, predicted_rating):
         # Fallback to threshold-based approach
         return predicted_rating >= 3.5 if predicted_rating is not None else None
 
-def get_user_like_stats(username):
-    """Get user's historical like statistics from the database"""
-    try:
-        client = MongoClient(DB_URI)
-        db = client[DB_NAME]
-        users_collection = db[USERS_COLLECTION]
-        # Get user document
-        user_doc = users_collection.find_one(
-            {"username": username}, 
-            {"_id": 0, "stats": 1}
-        )
-        
-        if not user_doc or "stats" not in user_doc:
-            # Return default values if user not found
-            return {
-                "like_rate": 0.5,
-                "review_count": 1,
-                "total_likes": 0,
-                "total_ratings": 1
-            }
-        
-        stats = user_doc["stats"]
-        num_ratings = stats.get("num_ratings", 0)
-        num_likes = stats.get("num_likes", 0)
-        
-        # Calculate like rate, avoiding division by zero
-        if num_ratings > 0:
-            like_rate = num_likes / num_ratings
-        else:
-            like_rate = 0.5  # Default value
-        
-        return {
-            "like_rate": like_rate,
-            "review_count": num_ratings,
-            "total_likes": num_likes,
-            "total_ratings": num_ratings,
-            "avg_rating": stats.get("avg_rating", 3.0),
-            "rating_stddev": stats.get("stdev_rating", 1.0)
-        }
-        
-    except Exception as e:
-        logger.warning(f"Error getting like stats for user {username}: {e}")
-        # Return safe default values
-        return {
-            "like_rate": 0.5,
-            "review_count": 1,
-            "total_likes": 0,
-            "total_ratings": 1,
-            "avg_rating": 3.0,
-            "rating_stddev": 1.0
-        }
-    finally:
-        client.close()
+def get_default_user_stats():
+    """Return default user statistics when user data is not available"""
+    return {
+        'user_avg_rating': 3.0,
+        'user_stdev_rating': 1.0,
+        'user_like_ratio': 0.5,
+        'user_num_ratings': 1,
+        'user_num_likes': 0,
+        'user_median_rating': 3.0,
+        'max_genre_rating': 3.0,
+        'min_genre_rating': 3.0,
+        'avg_genre_rating': 3.0,
+        'genre_rating_std': 0.0,
+        'total_genre_watches': 0,
+        'genre_coverage': 0.0
+    }
+
+def get_default_film_stats():
+    """Return default film statistics when film data is not available"""
+    return {
+        'film_avg_rating': 3.0,
+        'film_like_ratio': 0.5,
+        'film_num_ratings': 1,
+        'film_letterboxd_avg': 3.0,
+        'film_runtime': 120,
+        'film_year': 2000,
+        'film_genres': []
+    }

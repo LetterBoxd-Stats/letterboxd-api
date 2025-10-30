@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify
 from api.db import get_db
 import api.config
 import logging
-from prediction.predictor import get_model, predict_like
+from prediction.predictor import get_model, predict_rating, predict_like
 import traceback
 import numpy as np
 
@@ -14,23 +14,22 @@ def predict_film(film_id):
     """
     GET /predict/<film_id>
     Returns predicted ratings AND likes for all users for a given film.
-    Uses actual user liking patterns to predict likes.
+    Uses XGBoost models for both rating and like prediction.
     """
-
     db = get_db()
     users_collection = db[api.config.DB_USERS_COLLECTION]
     films_collection = db[api.config.DB_FILMS_COLLECTION]
 
     try:
-        model_dict = get_model()  # This now returns a dictionary with both models
-        rating_model = model_dict["rating_model"]  # Extract the actual SVD model
+        model_dict = get_model()  # Get the model dictionary with both models
+        logger.info(f"Using {model_dict['model_type']} model for predictions")
     except Exception as e:
         logger.error(f"Error loading model: {traceback.format_exc()}")
         return jsonify({"error": "Failed to load prediction model"}), 500
 
     try:
         users = list(users_collection.find({}, {"_id": 0, "username": 1}))
-        film = db[api.config.DB_FILMS_COLLECTION].find_one({"film_id": film_id}, {"_id": 0})
+        film = films_collection.find_one({"film_id": film_id}, {"_id": 0})
 
         if not film:
             return jsonify({"error": f"Film with id {film_id} not found"}), 404
@@ -56,13 +55,17 @@ def predict_film(film_id):
                 })
             else:
                 try:
-                    # Get predicted rating - use the actual SVD model, not the dictionary
-                    pred = rating_model.predict(username, film_id)
-                    predicted_rating = round(pred.est, 2)
+                    # Get predicted rating using XGBoost model
+                    predicted_rating = predict_rating(
+                        model_dict=model_dict,
+                        username=username,
+                        film_id=film_id,
+                        film_data=film
+                    )
                     
-                    # Get predicted like using the enhanced like prediction
+                    # Get predicted like
                     predicted_like = predict_like(
-                        model=model_dict,  # Pass the full model dictionary
+                        model_dict=model_dict,
                         username=username,
                         film_id=film_id,
                         film_data=film,
