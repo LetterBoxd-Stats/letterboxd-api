@@ -115,6 +115,8 @@ def compute_user_stats(db, users_collection_name, films_collection_name):
         # Genre statistics - from ALL interactions (reviews + watches)
         genre_counts = {genre: 0 for genre in all_genres}
         genre_ratings = {genre: [] for genre in all_genres}  # Only from reviews with ratings
+        genre_likes = {genre: 0 for genre in all_genres}    # Likes per genre from all interactions
+        genre_interactions = {genre: 0 for genre in all_genres}  # Total interactions per genre
         total_runtime = 0
         total_years = 0
         count_with_runtime = 0
@@ -131,6 +133,12 @@ def compute_user_stats(db, users_collection_name, films_collection_name):
                 for genre in film['metadata'].get('genres', []):
                     if genre in genre_counts:
                         genre_counts[genre] += 1
+                        genre_interactions[genre] += 1
+                        
+                        # Track likes for this genre
+                        if interaction.get('is_liked'):
+                            genre_likes[genre] += 1
+                            
                         # Only add rating if this is a review with a rating
                         if 'rating' in interaction:
                             genre_ratings[genre].append(interaction['rating'])
@@ -177,11 +185,18 @@ def compute_user_stats(db, users_collection_name, films_collection_name):
             percentage = (count / num_watches * 100) if num_watches > 0 else 0
             avg_genre_rating = statistics.mean(genre_ratings[genre]) if genre_ratings[genre] else None
             genre_stddev = statistics.stdev(genre_ratings[genre]) if len(genre_ratings[genre]) > 1 else None
+            
+            # Calculate genre like statistics
+            genre_num_likes = genre_likes[genre]
+            genre_like_ratio = (genre_num_likes / genre_interactions[genre]) if genre_interactions[genre] > 0 else None
+            
             genre_stats[genre] = {
                 'count': count,
                 'percentage': percentage,
                 'avg_rating': avg_genre_rating,
-                'stddev': genre_stddev
+                'stddev': genre_stddev,
+                'num_likes': genre_num_likes,
+                'like_ratio': genre_like_ratio
             }
 
         mean_diff = (sum(diffs) / len(diffs)) if diffs else None
@@ -226,7 +241,7 @@ def compute_user_stats(db, users_collection_name, films_collection_name):
                 }
             }}
         )
-
+    
     logging.info("User statistics updated successfully.")
 
 def compute_superlatives(db, users_collection_name, films_collection_name, superlatives_collection_name):
@@ -869,8 +884,8 @@ def main():
     logging.info("Connected to MongoDB")
 
     # Compute statistics
-    # compute_film_stats(db, films_collection_name)
-    # compute_user_stats(db, users_collection_name, films_collection_name)
+    compute_film_stats(db, films_collection_name)
+    compute_user_stats(db, users_collection_name, films_collection_name)
     compute_superlatives(db, users_collection_name, films_collection_name, superlatives_collection_name)
 
 if __name__ == "__main__":
