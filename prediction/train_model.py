@@ -56,28 +56,42 @@ def extract_enhanced_training_data(users_collection=users_col, films_collection=
         username = user.get("username")
         users_data[username] = user.get("stats", {})
     
-    # Process films and their reviews
+    # Process films with ANY interactions (reviews OR watches)
     cursor = films_collection.find(
-        {"reviews": {"$exists": True, "$ne": []}},
+        {"$or": [
+            {"reviews": {"$exists": True, "$ne": []}}, 
+            {"watches": {"$exists": True, "$ne": []}}
+        ]},
         {"film_id": 1, "film_title": 1, "avg_rating": 1, "like_ratio": 1, 
-         "metadata": 1, "reviews": 1, "num_ratings": 1, "num_likes": 1}
+         "metadata": 1, "reviews": 1, "watches": 1, "num_ratings": 1, "num_likes": 1, "num_watches": 1}
     )
 
     for film in cursor:
         film_id = film.get("film_id")
         film_reviews = film.get("reviews", [])
-        film_avg_rating = film.get("avg_rating", 0)
+        film_watches = film.get("watches", [])
+        
+        # Handle films with no reviews (only watches)
+        film_has_reviews = len(film_reviews) > 0
+        
+        # Use fallback for films with no reviews
+        film_avg_rating = film.get("avg_rating")
+        if film_avg_rating is None:
+            film_avg_rating = film.get("metadata", {}).get("avg_rating", 3.0)  # Use Letterboxd average as fallback
+        
         film_like_ratio = film.get("like_ratio", 0)
         film_num_ratings = film.get("num_ratings", 0)
         film_num_likes = film.get("num_likes", 0)
+        film_num_watches = film.get("num_watches", 0)
         metadata = film.get("metadata", {})
 
         # Film metadata
         film_genres = metadata.get("genres", [])
         film_runtime = metadata.get("runtime", 0)
         film_year = metadata.get("year", 0)
-        film_letterboxd_avg = metadata.get("avg_rating", 0)
+        film_letterboxd_avg = metadata.get("avg_rating", 3.0)  # Always available from metadata
 
+        # Process REVIEWS (have ratings and potentially likes)
         for review in film_reviews:
             user = review.get("user")
             rating = review.get("rating")
@@ -85,84 +99,115 @@ def extract_enhanced_training_data(users_collection=users_col, films_collection=
 
             if user and rating and user in users_data:
                 user_stats = users_data[user]
+                process_interaction(
+                    user, user_stats, film_id, film_reviews, film_watches,
+                    film_avg_rating, film_like_ratio, film_num_ratings, film_num_likes, film_num_watches,
+                    film_genres, film_runtime, film_year, film_letterboxd_avg,
+                    rating, is_liked, True,  # is_review=True
+                    rating_records, like_records
+                )
 
-                # --- Compute leave-one-out film aggregates ---
-                other_reviews = [r for r in film_reviews if r.get("user") != user and r.get("rating") is not None]
-                
-                # Use sentinel values when data is insufficient
-                SENTINEL_MISSING = -1.0
-                
-                if len(other_reviews) >= 2:  # Require minimum samples for reliable aggregates
-                    other_ratings = [float(r["rating"]) for r in other_reviews]
-                    other_likes = [r.get("is_liked", False) for r in other_reviews]
-                    film_avg_rating_excl_user = sum(other_ratings) / len(other_ratings)
-                    film_like_ratio_excl_user = sum(1 for l in other_likes if l) / len(other_likes)
-                else:
-                    # Use sentinel values instead of fallbacks
-                    film_avg_rating_excl_user = SENTINEL_MISSING
-                    film_like_ratio_excl_user = SENTINEL_MISSING
+        # Process WATCHES (have likes but no ratings) - ONLY for like prediction
+        for watch in film_watches:
+            user = watch.get("user")
+            is_liked = watch.get("is_liked", False)
 
-                # --- Compute leave-one-out user aggregates ---
-                user_num_ratings_full = user_stats.get("num_ratings", 1)
-                user_num_likes_full = user_stats.get("num_likes", 0)
-
-                user_num_ratings_excl = max(1, user_num_ratings_full - 1)
-                user_num_likes_excl = max(0, user_num_likes_full - (1 if is_liked else 0))
-
-                if user_num_ratings_excl > 1:  # Require minimum samples
-                    user_avg_rating_excl_film = (
-                        (user_stats.get("avg_rating", 0) * user_num_ratings_full - float(rating))
-                        / user_num_ratings_excl
-                    )
-                    user_like_ratio_excl_film = user_num_likes_excl / user_num_ratings_excl
-                else:
-                    # Use sentinel values
-                    user_avg_rating_excl_film = SENTINEL_MISSING
-                    user_like_ratio_excl_film = SENTINEL_MISSING
-
-                # --- Base feature set shared by both rating & like models ---
-                base_features = {
-                    "user_id": user,
-                    "film_id": film_id,
-                    "rating": float(rating),
-
-                    # User-level
-                    "user_avg_rating": user_avg_rating_excl_film,
-                    "user_stdev_rating": user_stats.get("stdev_rating", SENTINEL_MISSING),
-                    "user_like_ratio": user_like_ratio_excl_film,
-                    "user_num_likes": user_num_likes_excl,
-
-                    # Film-level
-                    "film_avg_rating": film_avg_rating_excl_user,
-                    "film_like_ratio": film_like_ratio_excl_user,
-                    "film_num_ratings": film_num_ratings,
-                    "film_letterboxd_avg": film_letterboxd_avg,
-                    "film_runtime": film_runtime,
-                    "film_year": film_year,
-
-                    # Genre compatibility
-                    **get_genre_compatibility_features(user_stats, film_genres),
-                }
-
-                # Only include records with sufficient data for key features
-                if (user_avg_rating_excl_film != SENTINEL_MISSING and 
-                    film_avg_rating_excl_user != SENTINEL_MISSING):
-                    
-                    # --- Rating model record ---
-                    rating_records.append(base_features.copy())
-
-                    # --- Like model record ---
-                    if is_liked is not None:
-                        like_record = base_features.copy()
-                        like_record["is_liked"] = bool(is_liked)
-                        like_record.update({
-                            "high_rated_film": film_avg_rating_excl_user >= 4.0 if film_avg_rating_excl_user != SENTINEL_MISSING else False,
-                        })
-                        like_records.append(like_record)
-
+            if user and user in users_data:
+                user_stats = users_data[user]
+                process_interaction(
+                    user, user_stats, film_id, film_reviews, film_watches,
+                    film_avg_rating, film_like_ratio, film_num_ratings, film_num_likes, film_num_watches,
+                    film_genres, film_runtime, film_year, film_letterboxd_avg,
+                    None, is_liked, False,  # is_review=False, no rating
+                    rating_records, like_records
+                )
     
-    logging.info(f"Filtered to {len(rating_records)} rating records with sufficient data")
+    logging.info(f"Extracted {len(rating_records)} rating records and {len(like_records)} like records")
     return rating_records, like_records, users_data
+
+def process_interaction(user, user_stats, film_id, film_reviews, film_watches,
+                       film_avg_rating, film_like_ratio, film_num_ratings, film_num_likes, film_num_watches,
+                       film_genres, film_runtime, film_year, film_letterboxd_avg,
+                       rating, is_liked, is_review, rating_records, like_records):
+    """Process a single user-film interaction (review or watch)"""
+    
+    # Combine all interactions for aggregate calculations
+    all_film_interactions = film_reviews + film_watches
+    
+    # --- Compute leave-one-out film aggregates ---
+    other_interactions = [r for r in all_film_interactions if r.get("user") != user]
+    
+    # Use sentinel values when data is insufficient
+    SENTINEL_MISSING = -1.0
+    
+    if len(other_interactions) >= 2:
+        # For ratings: only use reviews with ratings
+        other_ratings = [float(r["rating"]) for r in other_interactions if r.get("rating") is not None]
+        film_avg_rating_excl_user = sum(other_ratings) / len(other_ratings) if other_ratings else SENTINEL_MISSING
+        
+        # For likes: use all interactions (reviews + watches)
+        other_likes = [r.get("is_liked", False) for r in other_interactions]
+        film_like_ratio_excl_user = sum(1 for l in other_likes if l) / len(other_likes)
+    else:
+        film_avg_rating_excl_user = SENTINEL_MISSING
+        film_like_ratio_excl_user = SENTINEL_MISSING
+
+    # --- Compute leave-one-out user aggregates ---
+    user_num_ratings_full = user_stats.get("num_ratings", 1)
+    user_num_likes_full = user_stats.get("num_likes", 0)
+    user_num_watches_full = user_stats.get("num_watches", 1)
+
+    # Adjust counts excluding current interaction
+    user_num_ratings_excl = max(1, user_num_ratings_full - (1 if is_review else 0))
+    user_num_likes_excl = max(0, user_num_likes_full - (1 if is_liked else 0))
+    user_num_watches_excl = max(1, user_num_watches_full - 1)
+
+    if user_num_ratings_excl > 1 and is_review:
+        user_avg_rating_excl_film = (
+            (user_stats.get("avg_rating", 0) * user_num_ratings_full - float(rating))
+            / user_num_ratings_excl
+        )
+    else:
+        user_avg_rating_excl_film = user_stats.get("avg_rating", 3.0) if user_num_ratings_excl > 0 else SENTINEL_MISSING
+    
+    user_like_ratio_excl_film = user_num_likes_excl / user_num_watches_excl if user_num_watches_excl > 0 else SENTINEL_MISSING
+
+    # --- Base feature set ---
+    base_features = {
+        "user_id": user,
+        "film_id": film_id,
+        "rating": float(rating) if rating else SENTINEL_MISSING,
+        "is_review": is_review,  # Track if this is a review or watch
+
+        # User-level
+        "user_avg_rating": user_avg_rating_excl_film,
+        "user_stdev_rating": user_stats.get("stdev_rating", SENTINEL_MISSING),
+        "user_like_ratio": user_like_ratio_excl_film,
+        "user_num_likes": user_num_likes_excl,
+        "user_num_watches": user_num_watches_excl,
+
+        # Film-level
+        "film_avg_rating": film_avg_rating_excl_user,
+        "film_like_ratio": film_like_ratio_excl_user,
+        "film_num_ratings": film_num_ratings,
+        "film_num_watches": film_num_watches,
+        "film_letterboxd_avg": film_letterboxd_avg,
+        "film_runtime": film_runtime,
+        "film_year": film_year,
+
+        # Genre compatibility
+        **get_genre_compatibility_features(user_stats, film_genres),
+    }
+
+    # --- Rating model: only use reviews (with actual ratings) ---
+    if is_review and rating and user_avg_rating_excl_film != SENTINEL_MISSING and film_avg_rating_excl_user != SENTINEL_MISSING:
+        rating_records.append(base_features.copy())
+
+    # --- Like model: use both reviews AND watches ---
+    if is_liked is not None and user_like_ratio_excl_film != SENTINEL_MISSING:
+        like_record = base_features.copy()
+        like_record["is_liked"] = bool(is_liked)
+        like_records.append(like_record)
 
 def get_genre_compatibility_features(user_stats, film_genres):
     """Calculate genre compatibility features between user and film"""
@@ -341,7 +386,7 @@ def train_xgboost_like_model(like_records, rating_model, users_data):
         'user_like_ratio', 'user_rating_consistency',
         
         # Film like characteristics
-        'film_avg_rating', 'film_like_ratio', 'film_num_ratings', 'high_rated_film',
+        'film_avg_rating', 'film_like_ratio', 'film_num_ratings',
         'film_letterboxd_avg', 'film_runtime', 'film_year',
         
         # Genre like patterns
@@ -359,7 +404,6 @@ def train_xgboost_like_model(like_records, rating_model, users_data):
             record['film_avg_rating'],                          # film_avg_rating
             record['film_like_ratio'],                          # film_like_ratio
             record['film_num_ratings'],                         # film_num_ratings
-            float(record['high_rated_film']),                   # high_rated_film
             record['film_letterboxd_avg'],                      # film_letterboxd_avg
             record['film_runtime'],                             # film_runtime
             record['film_year'],                                # film_year
@@ -502,7 +546,6 @@ def print_training_summary(rating_models, like_model, rating_records, like_recor
                 record['film_avg_rating'],
                 record['film_like_ratio'],
                 record['film_num_ratings'],
-                float(record['high_rated_film']),
                 record['film_letterboxd_avg'],
                 record['film_runtime'],
                 record['film_year'],

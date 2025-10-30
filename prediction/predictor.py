@@ -159,23 +159,143 @@ def get_user_stats(username):
     finally:
         client.close()
 
-def get_film_stats(film_data):
-    """Extract film statistics for feature engineering"""
+def get_film_stats(film_data, username=None):
+    """Extract film statistics for feature engineering, handling films with no reviews"""
     try:
         metadata = film_data.get("metadata", {})
         genres = metadata.get("genres", [])
         
+        # Handle films with no reviews (only watches)
+        film_avg_rating = film_data.get("avg_rating")
+        if film_avg_rating is None:
+            # Use Letterboxd average as fallback for films with no reviews
+            film_avg_rating = metadata.get("avg_rating", 3.0)
+        
         film_stats = {
-            'film_avg_rating': film_data.get("avg_rating", 3.0),
+            'film_avg_rating': film_avg_rating,  # Now guaranteed to have a value
             'film_like_ratio': film_data.get("like_ratio", 0.5),
-            'film_num_ratings': film_data.get("num_ratings", 1),
+            'film_num_ratings': film_data.get("num_ratings", 0),  # Could be 0 for watches-only
+            'film_num_watches': film_data.get("num_watches", 0),
             'film_letterboxd_avg': metadata.get("avg_rating", 3.0),
             'film_runtime': metadata.get("runtime", 120),
             'film_year': metadata.get("year", 2000),
-            'film_genres': genres
+            'film_genres': genres,
+            'film_has_reviews': film_data.get("num_ratings", 0) > 0  # Flag for films with reviews
         }
         
         return film_stats
+        
+    except Exception as e:
+        logger.warning(f"Error getting film stats: {e}")
+        return get_default_film_stats()
+
+def predict_rating(model_dict, username, film_id, film_data):
+    """Predict rating using XGBoost model - handle films with no reviews"""
+    try:
+        # Get user stats
+        user_stats = get_user_stats(username)
+        
+        # Get film stats (this now handles films with no reviews)
+        film_stats = get_film_stats(film_data)
+        
+        # For films with no reviews, we might want to adjust our confidence
+        if not film_stats.get('film_has_reviews', True):
+            logger.info(f"Predicting rating for film {film_id} with no review history")
+        
+        # Create feature vector
+        features = create_rating_feature_vector(user_stats, film_stats, model_dict["feature_columns"])
+        
+        # Convert to DataFrame with proper column names
+        feature_df = pd.DataFrame([features], columns=model_dict["feature_columns"])
+        
+        # Predict rating
+        predicted_rating = model_dict["rating_model"].predict(feature_df)[0]
+        
+        # Clip to valid rating range
+        predicted_rating = max(0.5, min(5.0, float(predicted_rating)))
+        
+        return round(predicted_rating, 2)
+        
+    except Exception as e:
+        logger.error(f"Rating prediction failed for {username}, {film_id}: {e}")
+        return None
+
+def predict_like(model_dict, username, film_id, film_data, predicted_rating):
+    """Predict whether a user will like a film - handle films with no reviews"""
+    
+    # If no like model is available, fall back to threshold-based approach
+    if not model_dict.get("has_like_model") or model_dict["like_model"] is None:
+        logger.info("Using fallback like prediction")
+        return predicted_rating >= 3.5 if predicted_rating is not None else None
+    
+    try:
+        # Get user and film stats (pass username to exclude user from film like ratio)
+        user_stats = get_user_stats(username)
+        film_stats = get_film_stats(film_data, username)
+        
+        # Get the actual feature names from the trained model
+        if hasattr(model_dict["like_model"], 'feature_names_'):
+            like_feature_names = model_dict["like_model"].feature_names_
+        else:
+            # Fallback to our expected feature names
+            like_feature_names = [
+                'user_like_ratio',
+                'user_rating_consistency',
+                'film_avg_rating', 
+                'film_like_ratio',
+                'film_num_ratings',
+                'film_letterboxd_avg',
+                'film_runtime',
+                'film_year',
+                'avg_genre_like_ratio',
+                'total_genre_watches'
+            ]
+        
+        # Prepare features for like prediction
+        features = []
+        for feature_name in like_feature_names:
+            if feature_name == 'user_like_ratio':
+                features.append(user_stats['user_like_ratio'])
+            elif feature_name == 'user_rating_consistency':
+                features.append(user_stats['user_rating_consistency'])
+            elif feature_name == 'film_avg_rating':
+                features.append(film_stats['film_avg_rating'])  # Now always has a value
+            elif feature_name == 'film_like_ratio':
+                features.append(film_stats['film_like_ratio'])
+            elif feature_name == 'film_num_ratings':
+                features.append(film_stats['film_num_ratings'])
+            elif feature_name == 'film_letterboxd_avg':
+                features.append(film_stats['film_letterboxd_avg'])
+            elif feature_name == 'film_runtime':
+                features.append(film_stats['film_runtime'])
+            elif feature_name == 'film_year':
+                features.append(film_stats['film_year'])
+            elif feature_name == 'avg_genre_like_ratio':
+                features.append(user_stats['avg_genre_like_ratio'])
+            elif feature_name == 'total_genre_watches':
+                features.append(user_stats['total_genre_watches'])
+            else:
+                # Default value for unknown features
+                logger.warning(f"Unknown feature in like model: {feature_name}")
+                features.append(0.0)
+        
+        # Convert to numpy array and DataFrame
+        features_array = np.array([features])
+        feature_df = pd.DataFrame(features_array, columns=like_feature_names)
+        
+        # Predict like probability
+        like_prob = model_dict["like_model"].predict_proba(feature_df)[0][1]
+        
+        logger.debug(f"Like probability for {username}: {like_prob:.3f}")
+        logger.debug(f"Film has reviews: {film_stats.get('film_has_reviews', 'unknown')}")
+        
+        # Return True if probability > 0.5
+        return like_prob > 0.5
+        
+    except Exception as e:
+        logger.warning(f"Like prediction failed for {username}, {film_id}: {e}")
+        # Fallback to threshold-based approach
+        return predicted_rating >= 3.5 if predicted_rating is not None else None
         
     except Exception as e:
         logger.warning(f"Error getting film stats: {e}")
@@ -252,7 +372,6 @@ def predict_like(model_dict, username, film_id, film_data, predicted_rating):
                 'film_avg_rating', 
                 'film_like_ratio',  # This might be the missing feature
                 'film_num_ratings',
-                'high_rated_film',
                 'film_letterboxd_avg',
                 'film_runtime',
                 'film_year',
@@ -273,8 +392,6 @@ def predict_like(model_dict, username, film_id, film_data, predicted_rating):
                 features.append(film_stats['film_like_ratio'])  # This might be causing leakage
             elif feature_name == 'film_num_ratings':
                 features.append(film_stats['film_num_ratings'])
-            elif feature_name == 'high_rated_film':
-                features.append(float(film_stats['film_avg_rating'] >= 4.0))
             elif feature_name == 'film_letterboxd_avg':
                 features.append(film_stats['film_letterboxd_avg'])
             elif feature_name == 'film_runtime':
@@ -329,9 +446,11 @@ def get_default_film_stats():
     return {
         'film_avg_rating': 3.0,
         'film_like_ratio': 0.5,
-        'film_num_ratings': 1,
+        'film_num_ratings': 0,  # Could be 0 for watches-only films
+        'film_num_watches': 1,
         'film_letterboxd_avg': 3.0,
         'film_runtime': 120,
         'film_year': 2000,
-        'film_genres': []
+        'film_genres': [],
+        'film_has_reviews': False
     }
