@@ -241,7 +241,9 @@ Returns all users and their scraped review data:
 					"count": 1,
 					"percentage": 33.333,
 					"avg_rating": 4.5,
-					"stddev": null
+					"stddev": null,
+					"num_likes": 1,
+					"like_ratio": 1
 				}
 			},
 			"avg_runtime": 102.3,
@@ -316,7 +318,9 @@ Query parameters:
 				"count": 1,
 				"percentage": 33.333,
 				"avg_rating": 4.5,
-				"stddev": null
+				"stddev": null,
+				"num_likes": 1,
+				"like_ratio": 1
 			}
 		},
 		"avg_runtime": 102.3,

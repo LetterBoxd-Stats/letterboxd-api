@@ -78,7 +78,7 @@ def predict_rating(model_dict, username, film_id, film_data):
         film_stats = get_film_stats(film_data)
         
         # Create feature vector
-        features = create_feature_vector(user_stats, film_stats, model_dict["feature_columns"])
+        features = create_rating_feature_vector(user_stats, film_stats, model_dict["feature_columns"])
         
         # Convert to DataFrame with proper column names
         feature_df = pd.DataFrame([features], columns=model_dict["feature_columns"])
@@ -95,18 +95,13 @@ def predict_rating(model_dict, username, film_id, film_data):
         logger.error(f"Rating prediction failed for {username}, {film_id}: {e}")
         return None
 
-def create_feature_vector(user_stats, film_stats, feature_columns):
-    """Create feature vector matching training features"""
+def create_rating_feature_vector(user_stats, film_stats, feature_columns):
+    """Create feature vector matching training features for RATING prediction"""
     # Default values for all possible features
     feature_defaults = {
         'user_avg_rating': 3.0,
         'user_stdev_rating': 1.0,
-        'user_like_ratio': 0.5,
-        'user_num_ratings': 1,
-        'user_num_likes': 0,
-        'user_median_rating': 3.0,
         'film_avg_rating': 3.0,
-        'film_like_ratio': 0.5,
         'film_num_ratings': 1,
         'film_letterboxd_avg': 3.0,
         'film_runtime': 120,
@@ -114,11 +109,7 @@ def create_feature_vector(user_stats, film_stats, feature_columns):
         'max_genre_rating': 3.0,
         'min_genre_rating': 3.0,
         'avg_genre_rating': 3.0,
-        'genre_rating_std': 0.0,
-        'total_genre_watches': 0,
-        'genre_coverage': 0.0,
-        'user_film_rating_diff': 0.0,
-        'film_user_avg_diff': 0.0
+        'total_genre_watches': 0
     }
     
     # Update with actual values
@@ -156,7 +147,7 @@ def get_user_stats(username):
             'user_like_ratio': stats.get("like_ratio", 0.5),
             'user_num_ratings': stats.get("num_ratings", 1),
             'user_num_likes': stats.get("num_likes", 0),
-            'user_median_rating': stats.get("median_rating", 3.0),
+            'user_rating_consistency': stats.get("mean_abs_diff", 0.5),
             **genre_stats
         }
         
@@ -199,37 +190,43 @@ def calculate_user_genre_stats(user_stats):
             'max_genre_rating': 3.0,
             'min_genre_rating': 3.0,
             'avg_genre_rating': 3.0,
-            'genre_rating_std': 0.0,
             'total_genre_watches': 0,
-            'genre_coverage': 0.0
+            'avg_genre_like_ratio': user_stats.get("like_ratio", 0.5)
         }
     
     genre_ratings = []
+    genre_like_ratios = []
     genre_counts = []
     
     for genre, stats in genre_stats_data.items():
         if stats.get("avg_rating") is not None:
             genre_ratings.append(stats["avg_rating"])
             genre_counts.append(stats.get("count", 0))
+        if stats.get("like_ratio") is not None:
+            genre_like_ratios.append(stats["like_ratio"])
     
     if genre_ratings:
-        return {
+        rating_stats = {
             'max_genre_rating': max(genre_ratings),
             'min_genre_rating': min(genre_ratings),
             'avg_genre_rating': sum(genre_ratings) / len(genre_ratings),
-            'genre_rating_std': np.std(genre_ratings) if len(genre_ratings) > 1 else 0.0,
-            'total_genre_watches': sum(genre_counts),
-            'genre_coverage': len(genre_ratings) / len(genre_stats_data) if genre_stats_data else 0.0
+            'total_genre_watches': sum(genre_counts)
         }
     else:
-        return {
+        rating_stats = {
             'max_genre_rating': user_stats.get("avg_rating", 3.0),
             'min_genre_rating': user_stats.get("avg_rating", 3.0),
             'avg_genre_rating': user_stats.get("avg_rating", 3.0),
-            'genre_rating_std': user_stats.get("stdev_rating", 1.0),
-            'total_genre_watches': 0,
-            'genre_coverage': 0.0
+            'total_genre_watches': 0
         }
+    
+    # Add like ratio stats
+    if genre_like_ratios:
+        rating_stats['avg_genre_like_ratio'] = sum(genre_like_ratios) / len(genre_like_ratios)
+    else:
+        rating_stats['avg_genre_like_ratio'] = user_stats.get("like_ratio", 0.5)
+    
+    return rating_stats
 
 def predict_like(model_dict, username, film_id, film_data, predicted_rating):
     """Predict whether a user will like a film using the trained like model"""
@@ -244,40 +241,64 @@ def predict_like(model_dict, username, film_id, film_data, predicted_rating):
         user_stats = get_user_stats(username)
         film_stats = get_film_stats(film_data)
         
-        # Prepare features for like prediction (must match training)
-        features = np.array([[
-            predicted_rating,                           # actual_rating
-            predicted_rating,                           # svd_pred_rating (same as actual for now)
-            predicted_rating,                           # feature_pred_rating (same as actual for now)
-            user_stats['user_avg_rating'],             # user_avg_rating
-            film_stats['film_avg_rating'],             # film_avg_rating
-            user_stats['user_like_ratio'],             # user_like_ratio
-            film_stats['film_like_ratio'],             # film_like_ratio
-            user_stats['avg_genre_rating'],            # avg_genre_rating
-            user_stats['genre_coverage'],              # genre_coverage
-            abs(predicted_rating - user_stats['user_avg_rating']),  # personal_rating_deviation
-            abs(predicted_rating - film_stats['film_avg_rating']),  # community_rating_deviation
-            float(predicted_rating > user_stats['user_avg_rating']),  # rating_above_user_avg
-            float(predicted_rating > film_stats['film_avg_rating']),  # rating_above_film_avg
-            float(film_stats['film_avg_rating'] >= 4.0),  # high_rated_film
-            user_stats.get('user_rating_consistency', 0.5),  # user_rating_consistency
-        ]])
+        # Get the actual feature names from the trained model
+        if hasattr(model_dict["like_model"], 'feature_names_'):
+            like_feature_names = model_dict["like_model"].feature_names_
+        else:
+            # Fallback to our expected feature names
+            like_feature_names = [
+                'user_like_ratio',
+                'user_rating_consistency',
+                'film_avg_rating', 
+                'film_like_ratio',  # This might be the missing feature
+                'film_num_ratings',
+                'high_rated_film',
+                'film_letterboxd_avg',
+                'film_runtime',
+                'film_year',
+                'avg_genre_like_ratio',
+                'total_genre_watches'
+            ]
         
-        # Convert to DataFrame with proper feature names
-        like_feature_names = [
-            'actual_rating', 'svd_pred_rating', 'feature_pred_rating',
-            'user_avg_rating', 'film_avg_rating', 'user_like_ratio', 'film_like_ratio',
-            'avg_genre_rating', 'genre_coverage', 'personal_rating_deviation',
-            'community_rating_deviation', 'rating_above_user_avg', 'rating_above_film_avg',
-            'high_rated_film', 'user_rating_consistency'
-        ]
+        # Prepare features for like prediction
+        features = []
+        for feature_name in like_feature_names:
+            if feature_name == 'user_like_ratio':
+                features.append(user_stats['user_like_ratio'])
+            elif feature_name == 'user_rating_consistency':
+                features.append(user_stats['user_rating_consistency'])
+            elif feature_name == 'film_avg_rating':
+                features.append(film_stats['film_avg_rating'])
+            elif feature_name == 'film_like_ratio':
+                features.append(film_stats['film_like_ratio'])  # This might be causing leakage
+            elif feature_name == 'film_num_ratings':
+                features.append(film_stats['film_num_ratings'])
+            elif feature_name == 'high_rated_film':
+                features.append(float(film_stats['film_avg_rating'] >= 4.0))
+            elif feature_name == 'film_letterboxd_avg':
+                features.append(film_stats['film_letterboxd_avg'])
+            elif feature_name == 'film_runtime':
+                features.append(film_stats['film_runtime'])
+            elif feature_name == 'film_year':
+                features.append(film_stats['film_year'])
+            elif feature_name == 'avg_genre_like_ratio':
+                features.append(user_stats['avg_genre_like_ratio'])
+            elif feature_name == 'total_genre_watches':
+                features.append(user_stats['total_genre_watches'])
+            else:
+                # Default value for unknown features
+                logger.warning(f"Unknown feature in like model: {feature_name}")
+                features.append(0.0)
         
-        feature_df = pd.DataFrame(features, columns=like_feature_names)
+        # Convert to numpy array and DataFrame
+        features_array = np.array([features])
+        feature_df = pd.DataFrame(features_array, columns=like_feature_names)
         
         # Predict like probability
         like_prob = model_dict["like_model"].predict_proba(feature_df)[0][1]
         
         logger.debug(f"Like probability for {username}: {like_prob:.3f}")
+        logger.debug(f"Used {len(like_feature_names)} features: {like_feature_names}")
         
         # Return True if probability > 0.5
         return like_prob > 0.5
@@ -295,13 +316,12 @@ def get_default_user_stats():
         'user_like_ratio': 0.5,
         'user_num_ratings': 1,
         'user_num_likes': 0,
-        'user_median_rating': 3.0,
+        'user_rating_consistency': 0.5,
         'max_genre_rating': 3.0,
         'min_genre_rating': 3.0,
         'avg_genre_rating': 3.0,
-        'genre_rating_std': 0.0,
         'total_genre_watches': 0,
-        'genre_coverage': 0.0
+        'avg_genre_like_ratio': 0.5
     }
 
 def get_default_film_stats():

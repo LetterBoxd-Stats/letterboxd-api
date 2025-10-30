@@ -39,3 +39,5 @@ jobs:
               run: python -m scrape.scraper
             - name: Compute stats
               run: python -m scrape.stats
+            - name: Train prediction model
+              run: python -m prediction.train_model

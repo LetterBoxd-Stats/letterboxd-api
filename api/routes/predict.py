@@ -54,37 +54,53 @@ def predict_film(film_id):
                     "already_watched": True
                 })
             else:
-                try:
-                    # Get predicted rating using XGBoost model
-                    predicted_rating = predict_rating(
-                        model_dict=model_dict,
-                        username=username,
-                        film_id=film_id,
-                        film_data=film
-                    )
-                    
-                    # Get predicted like
-                    predicted_like = predict_like(
-                        model_dict=model_dict,
-                        username=username,
-                        film_id=film_id,
-                        film_data=film,
-                        predicted_rating=predicted_rating
-                    )
-                    
-                except Exception as e:
-                    logger.warning(f"Prediction failed for user {username}, film {film_id}: {e}")
-                    predicted_rating = None
-                    predicted_like = None
+                # Check if user has watched but not rated
+                watch_doc = films_collection.find_one(
+                    {"film_id": film_id, "watches.user": username},
+                    {"_id": 0, "watches.$": 1}
+                )
+                if watch_doc:
+                    watch = watch_doc["watches"][0]
+                    predictions.append({
+                        "username": username,
+                        "film_id": film_id,
+                        "predicted_rating": None,
+                        "predicted_like": watch.get("is_liked"),
+                        "already_rated": False,
+                        "already_watched": True
+                    })
+                else:
+                    try:
+                        # Get predicted rating using XGBoost model
+                        predicted_rating = predict_rating(
+                            model_dict=model_dict,
+                            username=username,
+                            film_id=film_id,
+                            film_data=film
+                        )
+                        
+                        # Get predicted like
+                        predicted_like = predict_like(
+                            model_dict=model_dict,
+                            username=username,
+                            film_id=film_id,
+                            film_data=film,
+                            predicted_rating=predicted_rating
+                        )
+                        
+                    except Exception as e:
+                        logger.warning(f"Prediction failed for user {username}, film {film_id}: {e}")
+                        predicted_rating = None
+                        predicted_like = None
 
-                predictions.append({
-                    "username": username,
-                    "film_id": film_id,
-                    "predicted_rating": predicted_rating,
-                    "predicted_like": bool(predicted_like) if predicted_like is not None else None,
-                    "already_rated": False,
-                    "already_watched": False
-                })
+                    predictions.append({
+                        "username": username,
+                        "film_id": film_id,
+                        "predicted_rating": predicted_rating,
+                        "predicted_like": bool(predicted_like) if predicted_like is not None else None,
+                        "already_rated": False,
+                        "already_watched": False
+                    })
         
         return jsonify({
             "film_id": film_id,

@@ -44,7 +44,7 @@ users_col = db[USERS_COLLECTION]
 # ──────────────────────────────────────────────
 # 🧹 EXTRACT ENHANCED TRAINING DATA
 # ──────────────────────────────────────────────
-def extract_enhanced_training_data():
+def extract_enhanced_training_data(users_collection=users_col, films_collection=films_col):
     """Extract comprehensive training data with user stats and film metadata"""
     rating_records = []
     like_records = []
@@ -52,12 +52,12 @@ def extract_enhanced_training_data():
     # Pre-load all users data for quick access
     logging.info("Loading user statistics...")
     users_data = {}
-    for user in users_col.find():
+    for user in users_collection.find():
         username = user.get("username")
         users_data[username] = user.get("stats", {})
     
     # Process films and their reviews
-    cursor = films_col.find(
+    cursor = films_collection.find(
         {"reviews": {"$exists": True, "$ne": []}},
         {"film_id": 1, "film_title": 1, "avg_rating": 1, "like_ratio": 1, 
          "metadata": 1, "reviews": 1, "num_ratings": 1, "num_likes": 1}
@@ -88,15 +88,19 @@ def extract_enhanced_training_data():
 
                 # --- Compute leave-one-out film aggregates ---
                 other_reviews = [r for r in film_reviews if r.get("user") != user and r.get("rating") is not None]
-                if other_reviews:
+                
+                # Use sentinel values when data is insufficient
+                SENTINEL_MISSING = -1.0
+                
+                if len(other_reviews) >= 2:  # Require minimum samples for reliable aggregates
                     other_ratings = [float(r["rating"]) for r in other_reviews]
                     other_likes = [r.get("is_liked", False) for r in other_reviews]
                     film_avg_rating_excl_user = sum(other_ratings) / len(other_ratings)
                     film_like_ratio_excl_user = sum(1 for l in other_likes if l) / len(other_likes)
                 else:
-                    # Fallback to global film stats
-                    film_avg_rating_excl_user = film_avg_rating
-                    film_like_ratio_excl_user = film_like_ratio
+                    # Use sentinel values instead of fallbacks
+                    film_avg_rating_excl_user = SENTINEL_MISSING
+                    film_like_ratio_excl_user = SENTINEL_MISSING
 
                 # --- Compute leave-one-out user aggregates ---
                 user_num_ratings_full = user_stats.get("num_ratings", 1)
@@ -105,15 +109,16 @@ def extract_enhanced_training_data():
                 user_num_ratings_excl = max(1, user_num_ratings_full - 1)
                 user_num_likes_excl = max(0, user_num_likes_full - (1 if is_liked else 0))
 
-                if user_num_ratings_excl > 0:
+                if user_num_ratings_excl > 1:  # Require minimum samples
                     user_avg_rating_excl_film = (
                         (user_stats.get("avg_rating", 0) * user_num_ratings_full - float(rating))
                         / user_num_ratings_excl
                     )
                     user_like_ratio_excl_film = user_num_likes_excl / user_num_ratings_excl
                 else:
-                    user_avg_rating_excl_film = user_stats.get("avg_rating", 0)
-                    user_like_ratio_excl_film = user_stats.get("like_ratio", 0)
+                    # Use sentinel values
+                    user_avg_rating_excl_film = SENTINEL_MISSING
+                    user_like_ratio_excl_film = SENTINEL_MISSING
 
                 # --- Base feature set shared by both rating & like models ---
                 base_features = {
@@ -123,11 +128,9 @@ def extract_enhanced_training_data():
 
                     # User-level
                     "user_avg_rating": user_avg_rating_excl_film,
-                    "user_stdev_rating": user_stats.get("stdev_rating", 1.0),
+                    "user_stdev_rating": user_stats.get("stdev_rating", SENTINEL_MISSING),
                     "user_like_ratio": user_like_ratio_excl_film,
-                    "user_num_ratings": user_num_ratings_excl,
                     "user_num_likes": user_num_likes_excl,
-                    "user_median_rating": user_stats.get("median_rating", 3.0),
 
                     # Film-level
                     "film_avg_rating": film_avg_rating_excl_user,
@@ -139,27 +142,26 @@ def extract_enhanced_training_data():
 
                     # Genre compatibility
                     **get_genre_compatibility_features(user_stats, film_genres),
-
-                    # Derived numeric features
-                    "user_film_rating_diff": float(rating) - user_avg_rating_excl_film,
-                    "film_user_avg_diff": film_avg_rating_excl_user - user_avg_rating_excl_film,
                 }
 
-                # --- Rating model record ---
-                rating_records.append(base_features.copy())
+                # Only include records with sufficient data for key features
+                if (user_avg_rating_excl_film != SENTINEL_MISSING and 
+                    film_avg_rating_excl_user != SENTINEL_MISSING):
+                    
+                    # --- Rating model record ---
+                    rating_records.append(base_features.copy())
 
-                # --- Like model record ---
-                if is_liked is not None:
-                    like_record = base_features.copy()
-                    like_record["is_liked"] = bool(is_liked)
-                    like_record.update({
-                        "rating_above_user_avg": float(rating) > user_avg_rating_excl_film,
-                        "rating_above_film_avg": float(rating) > film_avg_rating_excl_user,
-                        "high_rated_film": film_avg_rating_excl_user >= 4.0,
-                    })
-                    like_records.append(like_record)
+                    # --- Like model record ---
+                    if is_liked is not None:
+                        like_record = base_features.copy()
+                        like_record["is_liked"] = bool(is_liked)
+                        like_record.update({
+                            "high_rated_film": film_avg_rating_excl_user >= 4.0 if film_avg_rating_excl_user != SENTINEL_MISSING else False,
+                        })
+                        like_records.append(like_record)
 
     
+    logging.info(f"Filtered to {len(rating_records)} rating records with sufficient data")
     return rating_records, like_records, users_data
 
 def get_genre_compatibility_features(user_stats, film_genres):
@@ -167,8 +169,8 @@ def get_genre_compatibility_features(user_stats, film_genres):
     genre_stats = user_stats.get("genre_stats", {})
     
     features = {}
-    genre_matches = []
-    avg_genre_ratings = []
+    genre_ratings = []      # For rating prediction
+    genre_like_ratios = []  # For like prediction
     genre_counts = []
     
     for genre in film_genres:
@@ -176,30 +178,38 @@ def get_genre_compatibility_features(user_stats, film_genres):
             genre_data = genre_stats[genre]
             genre_rating = genre_data.get("avg_rating")
             genre_count = genre_data.get("count", 0)
+            genre_like_ratio = genre_data.get("like_ratio")
             
             if genre_rating is not None:
-                genre_matches.append(genre_rating)
-                avg_genre_ratings.append(genre_rating)
+                genre_ratings.append(genre_rating)
                 genre_counts.append(genre_count)
+            
+            if genre_like_ratio is not None:
+                genre_like_ratios.append(genre_like_ratio)
     
-    # Genre compatibility metrics
-    if genre_matches:
-        features["max_genre_rating"] = max(genre_matches)
-        features["min_genre_rating"] = min(genre_matches)
-        features["avg_genre_rating"] = sum(genre_matches) / len(genre_matches)
-        features["genre_rating_std"] = np.std(genre_matches) if len(genre_matches) > 1 else 0
+    # Use -1 as sentinel value for missing data (outside normal range)
+    SENTINEL_MISSING = -1.0
+    
+    # Genre compatibility metrics for RATING prediction
+    if genre_ratings:
+        features["max_genre_rating"] = max(genre_ratings)
+        features["min_genre_rating"] = min(genre_ratings)
+        features["avg_genre_rating"] = sum(genre_ratings) / len(genre_ratings)
         features["total_genre_watches"] = sum(genre_counts)
-        features["genre_coverage"] = len(genre_matches) / len(film_genres) if film_genres else 0
     else:
-        # Default values when no genre match
+        # Use sentinel values instead of defaults
         features.update({
-            "max_genre_rating": user_stats.get("avg_rating", 3.0),
-            "min_genre_rating": user_stats.get("avg_rating", 3.0),
-            "avg_genre_rating": user_stats.get("avg_rating", 3.0),
-            "genre_rating_std": user_stats.get("stdev_rating", 1.0),
-            "total_genre_watches": 0,
-            "genre_coverage": 0
+            "max_genre_rating": SENTINEL_MISSING,
+            "min_genre_rating": SENTINEL_MISSING,
+            "avg_genre_rating": SENTINEL_MISSING,
+            "total_genre_watches": SENTINEL_MISSING,
         })
+    
+    # Genre compatibility metrics for LIKE prediction
+    if genre_like_ratios:
+        features["avg_genre_like_ratio"] = sum(genre_like_ratios) / len(genre_like_ratios)
+    else:
+        features["avg_genre_like_ratio"] = SENTINEL_MISSING
     
     return features
 
@@ -214,12 +224,17 @@ def train_xgboost_rating_model(rating_records):
     ratings_df = pd.DataFrame(rating_records)
     
     # Define feature columns (excluding target and IDs)
+    # Simplified: Focus on rating patterns only
     feature_columns = [
-        'user_avg_rating', 'user_stdev_rating', 'user_like_ratio', 'user_num_ratings',
-        'user_median_rating', 'film_avg_rating', 'film_like_ratio', 'film_num_ratings',
-        'film_letterboxd_avg', 'film_runtime', 'film_year', 'max_genre_rating',
-        'min_genre_rating', 'avg_genre_rating', 'genre_rating_std', 'total_genre_watches',
-        'genre_coverage'
+        # Core user behavior
+        'user_avg_rating', 'user_stdev_rating',
+        
+        # Film characteristics  
+        'film_avg_rating', 'film_num_ratings', 'film_letterboxd_avg',
+        'film_runtime', 'film_year',
+        
+        # Genre rating patterns
+        'max_genre_rating', 'min_genre_rating', 'avg_genre_rating', 'total_genre_watches'
     ]
     
     # Prepare features and target
@@ -229,11 +244,12 @@ def train_xgboost_rating_model(rating_records):
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    print(f"\n📊 TRAINING DATA STATISTICS:")
-    print(f"Training samples: {len(X_train):,}")
-    print(f"Test samples: {len(X_test):,}")
-    print(f"Target mean: {y_train.mean():.3f}, std: {y_train.std():.3f}")
-    print(f"Target range: [{y_train.min():.1f}, {y_train.max():.1f}]")
+    logging.info(f"\n📊 RATING MODEL TRAINING DATA:")
+    logging.info(f"Training samples: {len(X_train):,}")
+    logging.info(f"Test samples: {len(X_test):,}")
+    logging.info(f"Target mean: {y_train.mean():.3f}, std: {y_train.std():.3f}")
+    logging.info(f"Target range: [{y_train.min():.1f}, {y_train.max():.1f}]")
+    logging.info(f"Features: {len(feature_columns)}")
     
     # Train XGBoost model with parameters for better spread
     logging.info("Training XGBoost rating prediction model...")
@@ -272,12 +288,12 @@ def train_xgboost_rating_model(rating_records):
     mse = mean_squared_error(y_test, y_pred)
     rmse = np.sqrt(mse)
     
-    print(f"\n🎯 RATING MODEL PERFORMANCE:")
-    print(f"RMSE: {rmse:.3f}")
-    print(f"MSE: {mse:.3f}")
-    print(f"Predictions - Mean: {y_pred.mean():.3f}, Std: {y_pred.std():.3f}")
-    print(f"Predictions range: [{y_pred.min():.2f}, {y_pred.max():.2f}]")
-    print(f"Spread ratio: {y_pred.std() / y_train.std():.2f}")
+    logging.info(f"\n🎯 RATING MODEL PERFORMANCE:")
+    logging.info(f"RMSE: {rmse:.3f}")
+    logging.info(f"MSE: {mse:.3f}")
+    logging.info(f"Predictions - Mean: {y_pred.mean():.3f}, Std: {y_pred.std():.3f}")
+    logging.info(f"Predictions range: [{y_pred.min():.2f}, {y_pred.max():.2f}]")
+    logging.info(f"Spread ratio: {y_pred.std() / y_train.std():.2f}")
     
     # Feature importance
     importance_scores = rating_model.feature_importances_
@@ -286,9 +302,9 @@ def train_xgboost_rating_model(rating_records):
         'importance': importance_scores
     }).sort_values('importance', ascending=False)
     
-    print(f"\n📊 FEATURE IMPORTANCE (Top 10):")
-    for idx, row in feature_importance_df.head(10).iterrows():
-        print(f"  {row['feature']:.<25} {row['importance']:.4f}")
+    logging.info(f"\n📊 RATING FEATURE IMPORTANCE:")
+    for idx, row in feature_importance_df.iterrows():
+        logging.info(f"  {row['feature']:.<25} {row['importance']:.4f}")
     
     return {
         'model': rating_model,
@@ -319,20 +335,17 @@ def train_xgboost_like_model(like_records, rating_model, users_data):
     labels = []
     
     # Feature names for like prediction
+    # Simplified: Focus on like/engagement patterns only
     like_feature_names = [
-        'actual_rating',
-        'user_avg_rating', 
-        'film_avg_rating',
-        'user_like_ratio',
-        'film_like_ratio',
-        'avg_genre_rating',
-        'genre_coverage',
-        'personal_rating_deviation',
-        'community_rating_deviation',
-        'rating_above_user_avg',
-        'rating_above_film_avg',
-        'high_rated_film',
-        'user_rating_consistency'
+        # User like behavior
+        'user_like_ratio', 'user_rating_consistency',
+        
+        # Film like characteristics
+        'film_avg_rating', 'film_like_ratio', 'film_num_ratings', 'high_rated_film',
+        'film_letterboxd_avg', 'film_runtime', 'film_year',
+        
+        # Genre like patterns
+        'avg_genre_like_ratio', 'total_genre_watches'
     ]
     
     for _, record in like_df.iterrows():
@@ -341,19 +354,17 @@ def train_xgboost_like_model(like_records, rating_model, users_data):
         
         # Create feature vector for like prediction
         feature_vector = [
-            record['rating'],                                    # actual_rating
-            record['user_avg_rating'],                          # user_avg_rating
-            record['film_avg_rating'],                          # film_avg_rating
             record['user_like_ratio'],                          # user_like_ratio
-            record['film_like_ratio'],                          # film_like_ratio
-            record['avg_genre_rating'],                         # avg_genre_rating
-            record['genre_coverage'],                           # genre_coverage
-            abs(record['rating'] - record['user_avg_rating']),  # personal_rating_deviation
-            abs(record['rating'] - record['film_avg_rating']),  # community_rating_deviation
-            float(record['rating_above_user_avg']),             # rating_above_user_avg
-            float(record['rating_above_film_avg']),             # rating_above_film_avg
-            float(record['high_rated_film']),                   # high_rated_film
             user_stats.get("mean_abs_diff", 0),                 # user_rating_consistency
+            record['film_avg_rating'],                          # film_avg_rating
+            record['film_like_ratio'],                          # film_like_ratio
+            record['film_num_ratings'],                         # film_num_ratings
+            float(record['high_rated_film']),                   # high_rated_film
+            record['film_letterboxd_avg'],                      # film_letterboxd_avg
+            record['film_runtime'],                             # film_runtime
+            record['film_year'],                                # film_year
+            record['avg_genre_like_ratio'],                     # avg_genre_like_ratio
+            record['total_genre_watches']                       # total_genre_watches
         ]
         
         features.append(feature_vector)
@@ -370,9 +381,10 @@ def train_xgboost_like_model(like_records, rating_model, users_data):
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     
-    print(f"\n📊 LIKE PREDICTION DATA:")
-    print(f"Training samples: {len(X_train):,} (Likes: {y_train.sum():,}, Ratio: {y_train.mean():.3f})")
-    print(f"Test samples: {len(X_test):,} (Likes: {y_test.sum():,}, Ratio: {y_test.mean():.3f})")
+    logging.info(f"\n📊 LIKE MODEL TRAINING DATA:")
+    logging.info(f"Training samples: {len(X_train):,} (Likes: {y_train.sum():,}, Ratio: {y_train.mean():.3f})")
+    logging.info(f"Test samples: {len(X_test):,} (Likes: {y_test.sum():,}, Ratio: {y_test.mean():.3f})")
+    logging.info(f"Features: {len(like_feature_names)}")
     
     # Train XGBoost classifier
     logging.info("Training XGBoost like prediction model...")
@@ -413,12 +425,12 @@ def train_xgboost_like_model(like_records, rating_model, users_data):
     y_pred_proba = like_model.predict_proba(X_test)[:, 1]
     accuracy = accuracy_score(y_test, y_pred)
     
-    print(f"\n❤️  LIKE MODEL PERFORMANCE:")
-    print(f"Accuracy: {accuracy:.3f}")
-    print(f"Prediction distribution:")
-    print(f"  Like probability mean: {y_pred_proba.mean():.3f}")
-    print(f"  Like probability std: {y_pred_proba.std():.3f}")
-    print(f"  Like probability range: [{y_pred_proba.min():.3f}, {y_pred_proba.max():.3f}]")
+    logging.info(f"\n❤️  LIKE MODEL PERFORMANCE:")
+    logging.info(f"Accuracy: {accuracy:.3f}")
+    logging.info(f"Prediction distribution:")
+    logging.info(f"  Like probability mean: {y_pred_proba.mean():.3f}")
+    logging.info(f"  Like probability std: {y_pred_proba.std():.3f}")
+    logging.info(f"  Like probability range: [{y_pred_proba.min():.3f}, {y_pred_proba.max():.3f}]")
     
     # Feature importance
     like_importance_scores = like_model.feature_importances_
@@ -427,9 +439,9 @@ def train_xgboost_like_model(like_records, rating_model, users_data):
         'importance': like_importance_scores
     }).sort_values('importance', ascending=False)
     
-    print(f"\n📊 LIKE FEATURE IMPORTANCE:")
+    logging.info(f"\n📊 LIKE FEATURE IMPORTANCE:")
     for idx, row in like_importance_df.iterrows():
-        print(f"  {row['feature']:.<25} {row['importance']:.4f}")
+        logging.info(f"  {row['feature']:.<25} {row['importance']:.4f}")
     
     # Store feature names for future use
     like_model.feature_names_ = like_feature_names
@@ -440,59 +452,95 @@ def train_xgboost_like_model(like_records, rating_model, users_data):
 # ──────────────────────────────────────────────
 # 📊 TRAINING SUMMARY
 # ──────────────────────────────────────────────
-def print_training_summary(rating_models, like_model, rating_records, like_records):
+def print_training_summary(rating_models, like_model, rating_records, like_records, users_data):
     """Print comprehensive training summary"""
     
-    print("\n" + "="*80)
-    print("🎯 XGBOOST MODEL TRAINING SUMMARY")
-    print("="*80)
+    logging.info("\n" + "="*80)
+    logging.info("🎯 XGBOOST MODEL TRAINING SUMMARY")
+    logging.info("="*80)
     
     # Dataset statistics
-    print(f"\n📊 DATASET STATISTICS:")
-    print(f"   • Rating records: {len(rating_records):,}")
-    print(f"   • Like records: {len(like_records):,}")
+    logging.info(f"\n📊 DATASET STATISTICS:")
+    logging.info(f"   • Rating records: {len(rating_records):,}")
+    logging.info(f"   • Like records: {len(like_records):,}")
     like_count = len([r for r in like_records if r['is_liked']])
     dislike_count = len([r for r in like_records if not r['is_liked']])
-    print(f"   • Like/Dislike ratio: {like_count:,}/{dislike_count:,}")
+    logging.info(f"   • Like/Dislike ratio: {like_count:,}/{dislike_count:,}")
     
     # Rating model insights
     if 'performance' in rating_models:
         perf = rating_models['performance']
-        print(f"\n🎯 RATING PREDICTION MODEL:")
-        print(f"   • RMSE: {perf['rmse']:.3f}")
-        print(f"   • Prediction spread: {perf['pred_std']:.3f} (target: {perf['train_std']:.3f})")
-        print(f"   • Spread ratio: {perf['pred_std'] / perf['train_std']:.2f}")
+        logging.info(f"\n🎯 RATING PREDICTION MODEL:")
+        logging.info(f"   • RMSE: {perf['rmse']:.3f}")
+        logging.info(f"   • Prediction spread: {perf['pred_std']:.3f} (target: {perf['train_std']:.3f})")
+        logging.info(f"   • Spread ratio: {perf['pred_std'] / perf['train_std']:.2f}")
+        logging.info(f"   • Features: {len(rating_models['feature_columns'])}")
         
         # Top features
         top_features = rating_models['feature_importance'].head(3)
-        print(f"   • Top features:")
+        logging.info(f"   • Top features:")
         for _, row in top_features.iterrows():
-            print(f"     - {row['feature']}: {row['importance']:.3f}")
+            logging.info(f"     - {row['feature']}: {row['importance']:.3f}")
     
     # Like model insights
     if like_model and hasattr(like_model, 'feature_importance_df_'):
-        print(f"\n❤️  LIKE PREDICTION MODEL:")
-        print(f"   • Accuracy: {accuracy_score}")
+        # Calculate accuracy for the summary
+        like_df = pd.DataFrame(like_records)
+        like_feature_names = like_model.feature_names_
+        
+        # Prepare features for accuracy calculation
+        features = []
+        labels = []
+        
+        for _, record in like_df.iterrows():
+            user_id = record["user_id"]
+            user_stats = users_data.get(user_id, {})
+            
+            feature_vector = [
+                record['user_like_ratio'],
+                user_stats.get("mean_abs_diff", 0),
+                record['film_avg_rating'],
+                record['film_like_ratio'],
+                record['film_num_ratings'],
+                float(record['high_rated_film']),
+                record['film_letterboxd_avg'],
+                record['film_runtime'],
+                record['film_year'],
+                record['avg_genre_like_ratio'],
+                record['total_genre_watches']
+            ]
+            features.append(feature_vector)
+            labels.append(record['is_liked'])
+        
+        # Calculate accuracy
+        X = np.array(features)
+        y = np.array(labels)
+        y_pred = like_model.predict(X)
+        accuracy = accuracy_score(y, y_pred)
+        
+        logging.info(f"\n❤️  LIKE PREDICTION MODEL:")
+        logging.info(f"   • Accuracy: {accuracy:.3f}")
+        logging.info(f"   • Features: {len(like_model.feature_names_)}")
         top_like_features = like_model.feature_importance_df_.head(3)
-        print(f"   • Top features:")
+        logging.info(f"   • Top features:")
         for _, row in top_like_features.iterrows():
-            print(f"     - {row['feature']}: {row['importance']:.3f}")
+            logging.info(f"     - {row['feature']}: {row['importance']:.3f}")
     
     # Key findings
-    print(f"\n🔍 KEY FINDINGS:")
+    logging.info(f"\n🔍 KEY FINDINGS:")
     if 'performance' in rating_models:
         spread_ratio = rating_models['performance']['pred_std'] / rating_models['performance']['train_std']
         if spread_ratio > 0.8:
-            print(f"   ✅ Good prediction spread achieved ({spread_ratio:.2f})")
+            logging.info(f"   ✅ Good prediction spread achieved ({spread_ratio:.2f})")
         else:
-            print(f"   ⚠️  Predictions still somewhat centralized ({spread_ratio:.2f})")
+            logging.info(f"   ⚠️  Predictions still somewhat centralized ({spread_ratio:.2f})")
     
     if like_model:
-        print(f"   ✅ Like prediction model trained successfully")
+        logging.info(f"   ✅ Like prediction model trained successfully")
     else:
-        print(f"   ⚠️  Using fallback for like predictions")
+        logging.info(f"   ⚠️  Using fallback for like predictions")
     
-    print("="*80)
+    logging.info("="*80)
 
 # ──────────────────────────────────────────────
 # 💾 SAVE MODELS
@@ -593,7 +641,7 @@ def main():
         like_model = train_xgboost_like_model(like_records, rating_models, users_data)
         
         # Print comprehensive summary
-        print_training_summary(rating_models, like_model, rating_records, like_records)
+        print_training_summary(rating_models, like_model, rating_records, like_records, users_data)
         
         # Save models
         models_col = db[MODELS_COLLECTION]
