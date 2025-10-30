@@ -486,6 +486,7 @@ Logs are handled using Python's `logging` module and will appear in:
 ├──workflows/
     ├── scrape.yml     # Scrape action configuration
 	├── stats.yml	   # Compute stats action configuration
+	├── prediction.yml # Train prediction model action configuration
 ├── CODEOWNERS		   # List of codeowners that must approve PR
 api/
 ├── __init__.py
