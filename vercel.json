@@ -1,4 +1,5 @@
 {
+	"version": 2,
 	"builds": [
 		{
 			"src": "api/*.py",
@@ -13,5 +14,10 @@
 			"src": "/(.*)",
 			"dest": "api/index.py"
 		}
-	]
+	],
+	"functions": {
+		"api/*.py": {
+			"runtime": "python3.11"
+		}
+	}
 }
