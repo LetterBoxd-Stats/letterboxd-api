@@ -4,7 +4,6 @@ import api.config
 import logging
 from prediction.predictor import get_model, predict_rating, predict_like
 import traceback
-import numpy as np
 
 logger = logging.getLogger(__name__)
 predict_bp = Blueprint("predict", __name__, url_prefix="/predict")

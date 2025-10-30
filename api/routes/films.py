@@ -3,7 +3,6 @@ from api.db import get_db
 import api.config
 from api.helpers import get_film_sort_fields, get_film_filter_query
 import logging
-import re
 
 logger = logging.getLogger(__name__)
 films_bp = Blueprint('films', __name__, url_prefix='/films')
