@@ -5,7 +5,6 @@ Enhanced version using XGBoost for both rating prediction AND like prediction mo
 """
 
 import base64
-from surprise import Dataset, Reader, SVD
 from pymongo import MongoClient
 import logging
 from dotenv import load_dotenv
