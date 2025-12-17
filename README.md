@@ -1,6 +1,6 @@
 # Letterboxd API
 
-This is a Flask-based API for scraping and storing [Letterboxd](https://letterboxd.com) user review data. It supports scheduled and manual scraping, stores results in MongoDB, and exposes public film and user data via HTTP endpoints.
+This is a Flask-based API for exposing [Letterboxd](https://letterboxd.com) user review data via HTTP endpoints.
 
 Deployed on [Vercel](https://vercel.com), and configurable via environment variables.
 
@@ -455,52 +455,22 @@ python -m api.index
 
 ---
 
-## Scraping and Stats
-
-This project includes a preconfigured GitHub Actions workflow that automatically triggers the scraper and computes stats on a schedule (see `.github/workflows/scrape.yml`). This GitHub Action can also be triggered manually through the GitHub GUI. If you're setting this up in your own GitHub repo, ensure your GitHub repository secrets are configured.
-
-The schedule is defined using cron syntax in the workflow file:
-
-```yaml
-schedule:
-    - cron: "0 8 * * *" # runs every day at 8:00 AM UTC (2:00 AM CST / 3:00 AM CDT)
-```
-
-There is a separate preconfigured GitHub Actions workflow that triggers only a computation of the stats (see `.github/workflows/stats.yml`). This action is triggered manually through the GitHub GUI.
-
----
-
-## Logging
-
-Logs are handled using Python's `logging` module and will appear in:
-
--   Your terminal (local dev)
--   Vercel logs (production)
-
----
-
 ## Project Structure
 
 ```bash
 .github/
-├──workflows/
-    ├── scrape.yml     # Scrape action configuration
-	├── stats.yml	   # Compute stats action configuration
-	├── prediction.yml # Train prediction model action configuration
-├── CODEOWNERS		   # List of codeowners that must approve PR
+├── CODEOWNERS		   		# List of codeowners that must approve PR
 api/
 ├── __init__.py
-├── index.py           # Flask app and endpoints
-├── config.py          # Logging and environment loading
-├── db.py			   # Database configuration
-├── helpers.py	       # Helper functions
+├── index.py           		# Flask app and endpoints
+├── config.py          		# Logging and environment loading
+├── db.py			   		# Database configuration
+├── helpers.py	       		# Helper functions
 ├── routes/
-	├── films.py	   # Logic for films routes
-	├── users.py	   # Logic for users routes
-scrape/
-├── scraper.py		   # Scraping functionality
-├── stats.py		   # Stats computation
-.env                   # Local environment variables (not in repository)
+	├── films.py	   		# Logic for films routes
+	├── users.py	   		# Logic for users routes
+	├── superlatives.py		# Logic for users routes
+.env                   		# Local environment variables (not in repository)
 .gitignore
 README.md
 requirements.txt
