@@ -412,6 +412,7 @@ These variables are loaded via dotenv for local development and should also be a
 | `DB_USERS_COLLECTION`        | Collection name for user reviews                                       |
 | `DB_FILMS_COLLECTION`        | Collection name for film metadata                                      |
 | `DB_SUPERLATIVES_COLLECTION` | Collection name for superlatives                                       |
+| `DB_MODELS_COLLECTION`       | Collection name for prediction models                                  |
 | `LETTERBOXD_USERNAMES`       | Comma-separated list of usernames to scrape                            |
 | `LETTERBOXD_GENRES`          | Comma-separated list of genres in LetterBoxd                           |
 | `ENV`                        | Environment (`prod` or `dev`)                                          |
