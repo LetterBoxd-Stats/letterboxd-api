@@ -74,332 +74,55 @@ Returns a simple greeting.
 /films?crew=cinematographer&sort_by=metadata.runtime&sort_order=desc
 ```
 
-Returns a paginated list of scraped film entries according to the query parameters:
-
-```json
-{
-	"films": [
-		{
-			"film_id": "34722",
-			"film_link": "letterboxd.com/film/inception/",
-			"film_title": "Inception",
-			"avg_rating": 3.75,
-			"stddev_rating": 0.354,
-			"like_ratio": 0.25,
-			"num_likes": 1,
-			"num_ratings": 2,
-			"num_watches": 4,
-			"reviews": [
-				{
-					"user": "samuelmgaines",
-					"rating": 4,
-					"is_liked": false
-				},
-				{
-					"user": "devinbaron",
-					"rating": 3.5,
-					"is_liked": true
-				}
-			],
-			"watches": [
-				{
-					"user": "embrune",
-					"is_liked": false
-				},
-				{
-					"user": "nkilpatrick",
-					"is_liked": false
-				}
-			],
-			"last_metadata_update_time": "Thu, 11 Sep 2025 06:27:09 GMT",
-			"metadata": {
-				"actors": ["Leonardo DiCaprio"],
-				"avg_rating": 4.03,
-				"backdrop_url": "https://fake-url.com",
-				"crew": [
-					{
-						"name": "Christopher Nolan",
-						"role": "director"
-					}
-				],
-				"description": "A good movie about dreams and stuff",
-				"directors": ["Christopher Nolan"],
-				"genres": ["Sci-Fi"],
-				"runtime": 124,
-				"studios": ["Movie Studio"],
-				"themes": ["Dreaming"],
-				"year": 2015
-			}
-		}
-	],
-	"page": 1,
-	"per_page": 1,
-	"total_pages": 16,
-	"total_films": 16
-}
-```
+Returns a paginated list of scraped film entries according to the query parameters.
 
 ### `GET /films/{film_id}`
 
-Returns the film entry for the specified `film_id`:
-
-```json
-{
-	"film_id": "34722",
-	"film_title": "Inception",
-	"film_link": "https://letterboxd.com/film/inception/",
-	"avg_rating": 3.75,
-	"stddev_rating": 0.354,
-	"like_ratio": 0.25,
-	"num_likes": 1,
-	"num_ratings": 2,
-	"num_watches": 4,
-	"reviews": [
-		{
-			"user": "samuelmgaines",
-			"rating": 4,
-			"is_liked": false
-		},
-		{
-			"user": "devinbaron",
-			"rating": 3.5,
-			"is_liked": true
-		}
-	],
-	"watches": [
-		{
-			"user": "embrune",
-			"is_liked": false
-		},
-		{
-			"user": "nkilpatrick",
-			"is_liked": false
-		}
-	],
-	"metadata": {
-		"actors": ["Leonardo DiCaprio"],
-		"avg_rating": 4.03,
-		"backdrop_url": "https://fake-url.com",
-		"crew": [
-			{
-				"name": "Christopher Nolan",
-				"role": "director"
-			}
-		],
-		"description": "A good movie about dreams and stuff",
-		"directors": ["Christopher Nolan"],
-		"genres": ["Sci-Fi"],
-		"runtime": 124,
-		"studios": ["Movie Studio"],
-		"themes": ["Dreaming"],
-		"year": 2015
-	}
-}
-```
+Returns the film entry for the specified `film_id`.
 
 ### `GET /users`
 
 Returns all users and their scraped review data:
 
-```json
-[
-	{
-		"username": "samuelmgaines",
-		"last_update_time": "Tue, 22 Jul 2025 05:09:48 GMT",
-		"stats": {
-			"num_watches": 2,
-			"num_ratings": 1,
-			"avg_rating": 4.5,
-			"median_rating": 4.5,
-			"mode_rating": 4.5,
-			"stdev_rating": 0,
-			"rating_distr": {
-				"0.5": 0,
-				"1.0": 0,
-				"1.5": 0,
-				"2.0": 0,
-				"2.5": 0,
-				"3.0": 0,
-				"3.5": 0,
-				"4.0": 0,
-				"4.5": 1,
-				"5.0": 0
-			},
-			"num_likes": 1,
-			"like_ratio": 0.5,
-			"mean_abs_diff": 0.5,
-			"mean_diff": 0.5,
-			"pairwise_agreement": {
-				"devinbaron": {
-					"mean_abs_diff": 0.5,
-					"mean_diff": 0.5,
-					"num_shared": 1
-				}
-			},
-			"genre_stats": {
-				"Horror": {
-					"count": 1,
-					"percentage": 33.333,
-					"avg_rating": 4.5,
-					"stddev": null,
-					"num_likes": 1,
-					"like_ratio": 1
-				}
-			},
-			"avg_runtime": 102.3,
-			"total_runtime": 306.9,
-			"avg_year_watched": 2012.3
-		}
-	}
-]
-```
-
 ### `GET /users/{username}`
 
 Returns the user with the specified `username` and their scraped review data.
 
-Query parameters:
+#### Query Parameters
 
 -   `include_films`: boolean, optional (default `false`). Determines whether to include `reviews` and `watches` arrays, which can be large.
 
-```json
-{
-	"username": "samuelmgaines",
-	"last_update_time": "Tue, 22 Jul 2025 05:09:48 GMT",
-	"reviews": [
-		{
-			"film_id": "34772",
-			"film_title": "Inception",
-			"film_link": "https://letterboxd.com/film/inception/",
-			"rating": 4.5,
-			"is_liked": false
-		}
-	],
-	"watches": [
-		{
-			"film_id": "51621",
-			"film_title": "Good Will Hunting",
-			"film_link": "https://letterboxd.com/film/good-will-hunting/",
-			"is_liked": true
-		}
-	],
-	"stats": {
-		"num_watches": 2,
-		"num_ratings": 1,
-		"avg_rating": 4.5,
-		"median_rating": 4.5,
-		"mode_rating": 4.5,
-		"stdev_rating": 0,
-		"rating_distr": {
-			"0.5": 0,
-			"1": 0,
-			"1.5": 0,
-			"2": 0,
-			"2.5": 0,
-			"3": 0,
-			"3.5": 0,
-			"4": 0,
-			"4.5": 1,
-			"5": 0
-		},
-		"num_likes": 1,
-		"like_ratio": 0.5,
-		"mean_abs_diff": 0.5,
-		"mean_diff": 0.5,
-		"pairwise_agreement": {
-			"devinbaron": {
-				"mean_abs_diff": 0.5,
-				"mean_diff": 0.5,
-				"num_shared": 1
-			}
-		},
-		"genre_stats": {
-			"Horror": {
-				"count": 1,
-				"percentage": 33.333,
-				"avg_rating": 4.5,
-				"stddev": null,
-				"num_likes": 1,
-				"like_ratio": 1
-			}
-		},
-		"avg_runtime": 102.3,
-		"total_runtime": 306.9,
-		"avg_year_watched": 2012.3
-	}
-}
-```
-
 ### `GET /superlatives`
 
-Returns a list of superlatives.
+Returns a list of superlatives grouped within categories.
 
-```json
-[
-	{
-		"category": "User Superlatives",
-		"superlatives": [
-			{
-				"description": "User with the highest average rating",
-				"first": ["Martendo24680"],
-				"first_value": 3.5062380038387717,
-				"name": "Positive Polly",
-				"second": ["devinbaron"],
-				"second_value": 3.4747774480712166,
-				"third": ["samuelmgaines"],
-				"third_value": 3.4536082474226806
-			}
-		]
-	},
-	{
-		"category": "Film Superlatives",
-		"superlatives": [
-			{
-				"description": "Film with the highest negative rating difference from Letterboxd average",
-				"first": ["La Haine"],
-				"first_value": -1.6349999999999998,
-				"name": "Most Overrated Movie",
-				"second": ["A Minecraft Movie", "Tangled"],
-				"second_value": -1.5099999999999998,
-				"third": [],
-				"third_value": null
-			}
-		]
-	}
-]
-```
+### `GET /recommendations`
 
-### `GET /predict/{film_id}`
+Return a list of recommendations for a group of users to watch. Default behavior is to recommend movies all watchers have not seen.
 
-Returns a list of rating and like predictions for each user for the given film.
+#### Query Parameters
 
-```json
-{
-	"film_id": "51816",
-	"film_title": "The Godfather Part II",
-	"predictions": [
-		{
-			"already_rated": false,
-			"already_watched": false,
-			"film_id": "51816",
-			"predicted_like": true,
-			"predicted_rating": 3.49,
-			"username": "samuelmgaines"
-		},
-		{
-			"already_rated": true,
-			"already_watched": true,
-			"film_id": "51816",
-			"predicted_like": true,
-			"predicted_rating": 3.5,
-			"username": "devinbaron"
-		}
-	],
-	"total_users": 2
-}
-```
+-   `watchers`: string, required - Comma-separated list of usernames to recommend for
+-   `num_recs`: integer, optional (default `3`) - Number of movies to recommend
+-   `offset`: integer, optional (default `0`) - Number of recommendations to skip
+-   `ok_to_have_watched`: string, optional - Comma-separated subset of `watchers` to override default not-watched filter
+-   `max_ok_to_have_watched`: integer, optional (default `0`) - Maximum number of `watchers` that have already watched the movie
 
----
+    **Numeric Filters**
+
+-   `metadata.avg_rating_gte` / `metadata.avg_rating_lte`: integer, optional - Letterboxd's overall average rating
+-   `metadata.year_gte` / `metadata.year_lte`: integer, optional - Film release year
+-   `metadata.runtime_gte` / `metadata.runtime_lte`: integer, optional - Film runtime in minutes
+
+    **Text Field Filters**
+
+-   `directors`: string, optional - Comma-separated list of director name substrings (e.g., `directors=Nolan,Christopher`)
+-   `actors`: string, optional - Comma-separated list of actor name substrings (e.g., `actors=Leo,DeCap`)
+-   `studios`: string, optional - Comma-separated list of studio name substrings (e.g., `studios=Warner,Universal`)
+-   `themes`: string, optional - Comma-separated list of theme substrings (e.g., `themes=Noir,Romance`)
+-   `description`: string, optional - Comma-separated list of description substrings (e.g., `description=space,mission`)
+-   `crew`: string, optional - Comma-separated list of crew member name substrings (e.g., `crew=Johnny`)
+-   `genres`: string, optional - Comma-separated list of genres (e.g., `genres=Comedy,Drama`)
 
 ## Environment Variables
 

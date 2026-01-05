@@ -5,7 +5,7 @@ import api.config
 from api.routes.films import films_bp
 from api.routes.users import users_bp
 from api.routes.superlatives import superlatives_bp
-# from api.routes.predict import predict_bp
+from api.routes.recommendations import recommendations_bp
 
 api.config.configure_logging()
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ CORS(app, resources={r"/*": {"origins": allowed_origins}})
 app.register_blueprint(films_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(superlatives_bp)
-# app.register_blueprint(predict_bp)
+app.register_blueprint(recommendations_bp)
 
 @app.route('/')
 def home():
