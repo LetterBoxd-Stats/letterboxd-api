@@ -33,9 +33,15 @@ def get_recommendations():
     except ValueError:
         return jsonify({"error": "offset must be an integer"}), 400
     
-    ok_to_have_watched = []
-    if request.args.get('ok_to_have_watched'):
-        ok_to_have_watched = [w.strip() for w in request.args.get('ok_to_have_watched').split(',')]
+    # Handle ok_to_have_watched parameter - if "all", set to watchers
+    ok_to_have_watched_param = request.args.get('ok_to_have_watched')
+    if ok_to_have_watched_param:
+        if ok_to_have_watched_param.strip().lower() == 'all':
+            ok_to_have_watched = watchers.copy()
+        else:
+            ok_to_have_watched = [w.strip() for w in ok_to_have_watched_param.split(',')]
+    else:
+        ok_to_have_watched = []
     
     try:
         max_ok_to_have_watched = int(request.args.get('max_ok_to_have_watched', 0))
@@ -115,7 +121,7 @@ def get_recommendations():
     # Parse text field filters for MongoDB
     text_filters = {}
     
-    # Text fields to filter
+    # Text fields to filter - these should be treated as OR filters, not AND
     text_fields = ['directors', 'actors', 'studios', 'themes', 'description', 'crew', 'genres']
     for field in text_fields:
         param_value = request.args.get(field)
@@ -123,34 +129,43 @@ def get_recommendations():
             search_terms = [s.strip() for s in param_value.split(',')]
             text_filters[field] = search_terms
             
-            # Build MongoDB query for text filters
+            # Build MongoDB query for text filters with OR logic
             if field == 'description':
-                # For description, we need to search within the text
+                # For description, we need to search within the text with OR logic
                 description_queries = [{"metadata.description": {"$regex": term, "$options": "i"}} 
-                                      for term in search_terms]
+                                    for term in search_terms]
                 if description_queries:
-                    if '$and' not in mongo_query:
-                        mongo_query['$and'] = []
-                    mongo_query['$and'].extend(description_queries)
+                    if '$or' not in mongo_query:
+                        mongo_query['$or'] = []
+                    # Add each description query as a separate OR condition
+                    for query in description_queries:
+                        mongo_query['$or'].append(query)
             elif field == 'crew':
-                # For crew, we need to search within crew.name fields
+                # For crew, we need to search within crew.name fields with OR logic
                 crew_queries = [{"metadata.crew.name": {"$regex": term, "$options": "i"}} 
-                               for term in search_terms]
+                            for term in search_terms]
                 if crew_queries:
-                    if '$and' not in mongo_query:
-                        mongo_query['$and'] = []
-                    mongo_query['$and'].extend(crew_queries)
+                    if '$or' not in mongo_query:
+                        mongo_query['$or'] = []
+                    # Add each crew query as a separate OR condition
+                    for query in crew_queries:
+                        mongo_query['$or'].append(query)
             else:
                 # For arrays like directors, actors, studios, themes, genres
+                # Create OR conditions for each search term
                 field_queries = []
                 for term in search_terms:
-                    # Search for substring match in array elements
-                    field_queries.append({f"metadata.{field}": {"$regex": term, "$options": "i"}})
+                    # For each term, check if any element in the array matches the regex
+                    # Use $elemMatch for array fields
+                    if field in ['directors', 'actors', 'studios', 'themes', 'genres']:
+                        field_queries.append({f"metadata.{field}": {"$elemMatch": {"$regex": term, "$options": "i"}}})
                 
                 if field_queries:
-                    if '$and' not in mongo_query:
-                        mongo_query['$and'] = []
-                    mongo_query['$and'].extend(field_queries)
+                    if '$or' not in mongo_query:
+                        mongo_query['$or'] = []
+                    # Add each field query as a separate OR condition
+                    for query in field_queries:
+                        mongo_query['$or'].append(query)
     
     logger.info(f"MongoDB query: {mongo_query}")
     
@@ -233,12 +248,19 @@ def get_recommendations():
                 'runtime': film.get('metadata', {}).get('runtime'),
                 'genres': film.get('metadata', {}).get('genres', []),
                 'themes': film.get('metadata', {}).get('themes', []),
-                'description': film.get('metadata', {}).get('description', '')
+                'description': film.get('metadata', {}).get('description', ''),
+                'avg_rating': film.get('metadata', {}).get('avg_rating', None)
             },
-            'predicted_ratings': {
-                watcher: get_predicted_rating(film, watcher)
-                for watcher in watchers
-            }
+            'predicted_reviews': {
+                watcher: {
+                    "rating": get_predicted_rating(film, watcher),
+                    "is_liked": get_predicted_like(film, watcher)
+                } for watcher in watchers
+            },
+            'num_ratings': len(film.get('reviews', [])),
+            'num_watches': len(film.get('watches', [])) + len(film.get('reviews', [])),
+            'reviews': film.get('reviews', []),
+            'watches': film.get('watches', [])
         })
     
     return jsonify({
@@ -310,47 +332,60 @@ def passes_numeric_filters(film: Dict, filters: Dict) -> bool:
     return True
 
 def passes_text_filters(film: Dict, text_filters: Dict) -> bool:
-    """Check if film passes all text filters."""
+    """Check if film passes all text filters with OR logic."""
     metadata = film.get('metadata', {})
     
     for field, search_terms in text_filters.items():
+        field_lower_terms = [term.lower() for term in search_terms]
+        
         if field == 'directors':
             directors = metadata.get('directors', [])
-            if not any_contains_all_terms(directors, search_terms):
+            if not passes_or_filter(directors, field_lower_terms):
                 return False
         
         elif field == 'actors':
             actors = metadata.get('actors', [])
-            if not any_contains_all_terms(actors, search_terms):
+            if not passes_or_filter(actors, field_lower_terms):
                 return False
         
         elif field == 'studios':
             studios = metadata.get('studios', [])
-            if not any_contains_all_terms(studios, search_terms):
+            if not passes_or_filter(studios, field_lower_terms):
                 return False
         
         elif field == 'themes':
             themes = metadata.get('themes', [])
-            if not any_contains_all_terms(themes, search_terms):
+            if not passes_or_filter(themes, field_lower_terms):
                 return False
         
         elif field == 'description':
             description = metadata.get('description', '').lower()
-            if not all(term in description for term in search_terms):
+            # OR logic: description should contain at least one of the terms
+            if not any(term in description for term in field_lower_terms):
                 return False
         
         elif field == 'crew':
             crew = metadata.get('crew', [])
             crew_names = [member.get('name', '').lower() for member in crew]
-            if not any_contains_all_terms(crew_names, search_terms):
+            if not passes_or_filter(crew_names, field_lower_terms):
                 return False
         
         elif field == 'genres':
             genres = metadata.get('genres', [])
-            if not all(term in [g.lower() for g in genres] for term in search_terms):
+            genres_lower = [g.lower() for g in genres]
+            # OR logic: film should have at least one of the specified genres
+            if not any(term in genres_lower for term in field_lower_terms):
                 return False
     
     return True
+
+def passes_or_filter(items: List[str], search_terms: List[str]) -> bool:
+    """Check if any item contains any of the search terms (OR logic)."""
+    for item in items:
+        item_lower = str(item).lower()
+        if any(term in item_lower for term in search_terms):
+            return True
+    return False
 
 def any_contains_all_terms(items: List[str], terms: List[str]) -> bool:
     """Check if any item contains all search terms."""
@@ -421,4 +456,13 @@ def get_predicted_rating(film: Dict, username: str) -> Optional[float]:
                     return float(rating)
                 except (ValueError, TypeError):
                     return None
+    return None
+
+def get_predicted_like(film: Dict, username: str) -> Optional[bool]:
+    """Get predicted like status for a specific user from predicted_reviews."""
+    for pred_review in film.get('predicted_reviews', []):
+        if pred_review.get('user') == username:
+            is_liked = pred_review.get('predicted_like')
+            if isinstance(is_liked, bool):
+                return is_liked
     return None

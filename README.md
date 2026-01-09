@@ -105,8 +105,8 @@ Return a list of recommendations for a group of users to watch. Default behavior
 -   `watchers`: string, required - Comma-separated list of usernames to recommend for
 -   `num_recs`: integer, optional (default `3`) - Number of movies to recommend
 -   `offset`: integer, optional (default `0`) - Number of recommendations to skip
--   `ok_to_have_watched`: string, optional - Comma-separated subset of `watchers` to override default not-watched filter
--   `max_ok_to_have_watched`: integer, optional (default `0`) - Maximum number of `watchers` that have already watched the movie
+-   `ok_to_have_watched`: string, optional - Comma-separated subset of `watchers` to override default not-watched filter. Can be set to `"all"`
+-   `max_ok_to_have_watched`: integer, optional (default `0`) - Maximum number of `ok_to_have_watched` that have already watched the movie
 
     **Numeric Filters**
 
